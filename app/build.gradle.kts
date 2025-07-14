@@ -11,18 +11,43 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.trat"
+        applicationId = "com.quicktranslate.app"
         minSdk = 24
         targetSdk = 35
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        
+        // 앱 정보
+        resConfigs("ko", "en")  // 지원 언어 명시
+        
+        vectorDrawables {
+            useSupportLibrary = true
+        }
+    }
+
+    signingConfigs {
+        create("release") {
+            // 실제 출시시에는 keystore 파일로 교체 필요
+            // keyAlias = "release"
+            // keyPassword = "password"
+            // storeFile = file("release.keystore")
+            // storePassword = "password"
+        }
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-DEBUG"
+            isDebuggable = true
+        }
+        
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            // signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -73,6 +98,9 @@ dependencies {
     
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    
+    // Splash Screen
+    implementation("androidx.core:core-splashscreen:1.0.1")
     
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

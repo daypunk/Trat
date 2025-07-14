@@ -2,4 +2,12 @@
 <resources>
 
     <style name="Theme.Trat" parent="android:Theme.Material.Light.NoActionBar" />
+    
+    <!-- 스플래시 스크린 테마 -->
+    <style name="Theme.Trat.SplashScreen" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="windowSplashScreenAnimationDuration">300</item>
+        <item name="postSplashScreenTheme">@style/Theme.Trat</item>
+    </style>
 </resources>

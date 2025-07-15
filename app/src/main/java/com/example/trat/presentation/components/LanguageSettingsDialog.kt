@@ -72,7 +72,9 @@ fun LanguageSettingsDialog(
                             shape = RoundedCornerShape(12.dp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 unfocusedBorderColor = TossGray300,
-                                focusedBorderColor = TossInputMessage
+                                focusedBorderColor = TossInputMessage,
+                                unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                                focusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
                             )
                         )
                     }

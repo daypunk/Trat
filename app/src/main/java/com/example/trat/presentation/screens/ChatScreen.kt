@@ -440,7 +440,9 @@ private fun ChatInputBar(
                 enabled = !isTranslating && isModelReady,
                 colors = OutlinedTextFieldDefaults.colors(
                     unfocusedBorderColor = TossGray300,
-                    focusedBorderColor = TossInputMessage
+                    focusedBorderColor = TossInputMessage,
+                    unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                    focusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
                 )
             )
             
@@ -507,7 +509,11 @@ private fun SearchTopAppBar(
                 onValueChange = onSearchQueryChange,
                 placeholder = { Text("번역 메시지 검색...") },
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                    focusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                )
             )
         },
         navigationIcon = {

@@ -505,7 +505,7 @@ private fun SearchTopAppBar(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = onSearchQueryChange,
-                placeholder = { Text("메시지 검색...") },
+                placeholder = { Text("번역 메시지 검색...") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
@@ -568,7 +568,7 @@ private fun ChatMenuDrawer(
                 if (!isEditMode) {
                     TextButton(onClick = onCreateChatClick) {
                         Text(
-                            text = "+ 새 채팅", 
+                            text = "+ 새 번역", 
                             color = TossInputMessage,
                             fontWeight = FontWeight.SemiBold,
                             style = MaterialTheme.typography.bodyMedium
@@ -650,7 +650,7 @@ private fun ChatItemInMenu(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(68.dp) // 언어 정보 표시를 위해 높이 증가
+                .height(68.dp)
                 .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -674,9 +674,9 @@ private fun ChatItemInMenu(
                     maxLines = 1
                 )
                 
-                // 언어 정보 표시 (간결하게)
+                // 언어 정보 표시
                 Text(
-                    text = "${getLanguageFlag(chat.nativeLanguage.code)} ↔ ${getLanguageFlag(chat.translateLanguage.code)}  ${chat.nativeLanguage.displayName} ↔ ${chat.translateLanguage.displayName}",
+                    text = "${getLanguageFlag(chat.nativeLanguage.code)} ↔ ${getLanguageFlag(chat.translateLanguage.code)}",
                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                     maxLines = 1

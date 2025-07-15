@@ -28,7 +28,7 @@ class MainViewModel @Inject constructor(
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
     
     /**
-     * 새 채팅방 생성
+     * 새 번역 생성
      */
     fun createChat(
         title: String,

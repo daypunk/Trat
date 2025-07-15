@@ -8,9 +8,9 @@ enum class SupportedLanguage(
     val mlKitLanguage: String
 ) {
     KOREAN("ko", "한국어", TranslateLanguage.KOREAN),
-    ENGLISH("en", "English", TranslateLanguage.ENGLISH),
-    JAPANESE("ja", "日本語", TranslateLanguage.JAPANESE),
-    CHINESE("zh", "中文", TranslateLanguage.CHINESE);
+    ENGLISH("en", "영어", TranslateLanguage.ENGLISH),
+    JAPANESE("ja", "일본어", TranslateLanguage.JAPANESE),
+    CHINESE("zh", "중국어", TranslateLanguage.CHINESE);
     
     companion object {
         fun fromCode(code: String): SupportedLanguage? {

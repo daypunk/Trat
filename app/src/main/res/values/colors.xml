@@ -9,5 +9,10 @@
     <color name="white">#FFFFFFFF</color>
     
     <!-- 스플래시 스크린 색상 -->
-    <color name="splash_background">#667eea</color>
+    <color name="splash_background">#FFFFFF</color>
+    
+    <!-- 로고 색상 -->
+    <color name="logo_primary">#5CE0FF</color>
+    <color name="logo_secondary">#00FFDA</color>
+    <color name="logo_text">#222222</color>
 </resources>

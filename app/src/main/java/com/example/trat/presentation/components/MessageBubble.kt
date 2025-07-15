@@ -1,74 +1,114 @@
 package com.example.trat.presentation.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.trat.data.entities.Message
-import java.text.SimpleDateFormat
-import java.util.*
+import com.example.trat.ui.theme.*
 
 @Composable
 fun MessageBubble(
-    message: Message
+    message: Message,
+    isHighlighted: Boolean = false,
+    searchQuery: String = ""
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = if (message.isUserMessage) Alignment.End else Alignment.Start
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp)
     ) {
-        Card(
+        // 메시지 버블
+        Box(
             modifier = Modifier
-                .padding(
-                    start = if (message.isUserMessage) 48.dp else 0.dp,
-                    end = if (message.isUserMessage) 0.dp else 48.dp,
-                    top = 4.dp,
-                    bottom = 4.dp
-                ),
-            colors = CardDefaults.cardColors(
-                containerColor = if (message.isUserMessage) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.surfaceVariant
-                }
-            ),
-            shape = RoundedCornerShape(
-                topStart = 16.dp,
-                topEnd = 16.dp,
-                bottomStart = if (message.isUserMessage) 16.dp else 4.dp,
-                bottomEnd = if (message.isUserMessage) 4.dp else 16.dp
-            )
-        ) {
-            Column(
-                modifier = Modifier.padding(12.dp)
-            ) {
-                // 메시지 텍스트
-                Text(
-                    text = message.originalText,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = if (message.isUserMessage) {
-                        MaterialTheme.colorScheme.onPrimary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    }
+                .align(if (message.isUserMessage) Alignment.CenterEnd else Alignment.CenterStart)
+                .widthIn(min = 60.dp, max = 280.dp)
+                .background(
+                    color = when {
+                        isHighlighted -> TossGray200
+                        message.isUserMessage -> TossInputMessage
+                        else -> TossOutputMessage
+                    },
+                    shape = RoundedCornerShape(
+                        topStart = 18.dp,
+                        topEnd = 18.dp,
+                        bottomStart = if (message.isUserMessage) 18.dp else 6.dp,
+                        bottomEnd = if (message.isUserMessage) 6.dp else 18.dp
+                    )
                 )
-                
-                Spacer(modifier = Modifier.height(4.dp))
-                
-                // 시간
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+        ) {
+            Column {
+                // 원본 텍스트만 표시 (토스 스타일: 간소화)
                 Text(
-                    text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(message.timestamp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (message.isUserMessage) {
-                        MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
+                    text = if (searchQuery.isNotBlank()) {
+                        buildHighlightedText(
+                            text = if (message.originalText != message.translatedText) {
+                                "${message.originalText}\n${message.translatedText}"
+                            } else {
+                                message.originalText
+                            },
+                            searchQuery = searchQuery
+                        )
                     } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                    }
+                        buildAnnotatedString {
+                            append(message.originalText)
+                            // 번역이 다른 경우 번역된 텍스트도 보여주되, 구분선 없이 자연스럽게
+                            if (message.originalText != message.translatedText) {
+                                append("\n")
+                                withStyle(style = SpanStyle(fontSize = 14.sp, color = Color.White.copy(alpha = 0.85f))) {
+                                    append(message.translatedText)
+                                }
+                            }
+                        }
+                    },
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontSize = 16.sp,
+                        lineHeight = 20.sp
+                    ),
+                    color = Color.White,
+                    fontWeight = FontWeight.Normal
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun buildHighlightedText(text: String, searchQuery: String) = buildAnnotatedString {
+    val highlightColor = TossGray800
+    var startIndex = 0
+    
+    while (startIndex < text.length) {
+        val index = text.indexOf(searchQuery, startIndex, ignoreCase = true)
+        if (index == -1) {
+            append(text.substring(startIndex))
+            break
+        }
+        
+        // 하이라이트 이전 텍스트
+        append(text.substring(startIndex, index))
+        
+        // 하이라이트된 텍스트
+        withStyle(
+            style = SpanStyle(
+                background = Color.Yellow.copy(alpha = 0.7f),
+                color = TossGray900
+            )
+        ) {
+            append(text.substring(index, index + searchQuery.length))
+        }
+        
+        startIndex = index + searchQuery.length
     }
 } 

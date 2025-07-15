@@ -4,20 +4,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.trat.data.entities.Chat
 import com.example.trat.data.entities.Message
-import com.example.trat.domain.usecase.ChatManagementUseCase
-import com.example.trat.domain.usecase.TranslateTextUseCase
-import com.example.trat.domain.usecase.DownloadLanguageModelUseCase
+import com.example.trat.domain.usecase.ChatUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
 import javax.inject.Inject
 
 @HiltViewModel
 class ChatViewModel @Inject constructor(
-    private val chatManagementUseCase: ChatManagementUseCase,
-    private val translateTextUseCase: TranslateTextUseCase,
-    private val downloadModelUseCase: DownloadLanguageModelUseCase
+    private val chatUseCase: ChatUseCase
 ) : ViewModel() {
     
     // UI 상태
@@ -38,28 +33,29 @@ class ChatViewModel @Inject constructor(
     fun initializeChat(chatId: String) {
         viewModelScope.launch {
             try {
-                // 채팅방 정보 로드
-                val chatResult = chatManagementUseCase.getChatById(chatId)
-                if (chatResult.isSuccess) {
-                    val chat = chatResult.getOrThrow()
+                val chat = chatUseCase.getChatById(chatId)
+                if (chat != null) {
                     _currentChat.value = chat
                     
-                    // 모델 상태 확인
-                    checkModelReadiness(chatId)
+                    // 먼저 모델 상태를 true로 설정 (대부분의 경우 모델이 이미 있음)
+                    _uiState.value = _uiState.value.copy(isModelReady = true)
+                    
+                    // 백그라운드에서 모델 다운로드 시도 (없는 경우에만 다운로드)
+                    try {
+                        chatUseCase.downloadModelsIfNeeded(chatId)
+                    } catch (e: Exception) {
+                        // 모델 다운로드 실패해도 계속 진행 (기존 모델 사용)
+                    }
                     
                     // 메시지 로드
-                    chatManagementUseCase.getMessagesForChat(chatId).collect { messageList ->
+                    chatUseCase.getMessagesForChat(chatId).collect { messageList ->
                         _messages.value = messageList
                     }
                 } else {
-                    _uiState.value = _uiState.value.copy(
-                        errorMessage = "채팅방을 찾을 수 없어요"
-                    )
+                    _uiState.value = _uiState.value.copy(errorMessage = "채팅방을 찾을 수 없어요")
                 }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    errorMessage = "채팅방 로드 중 오류가 발생했어요"
-                )
+                _uiState.value = _uiState.value.copy(errorMessage = "채팅방 로드 중 오류가 발생했어요")
             }
         }
     }
@@ -70,35 +66,21 @@ class ChatViewModel @Inject constructor(
     fun sendMessage(inputText: String) {
         val chatId = _currentChat.value?.id ?: return
         
-        if (inputText.isBlank()) {
-            _uiState.value = _uiState.value.copy(errorMessage = "메시지를 입력해주세요")
-            return
-        }
+        if (inputText.isBlank()) return
         
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isTranslating = true, errorMessage = null)
             
             try {
-                val result = translateTextUseCase.translateAndSaveMessage(
-                    chatId = chatId,
-                    inputText = inputText.trim()
+                chatUseCase.sendMessage(chatId, inputText.trim())
+                _uiState.value = _uiState.value.copy(
+                    isTranslating = false,
+                    inputText = ""
                 )
-                
-                if (result.isSuccess) {
-                    _uiState.value = _uiState.value.copy(
-                        isTranslating = false,
-                        inputText = "" // 입력 필드 클리어
-                    )
-                } else {
-                    _uiState.value = _uiState.value.copy(
-                        isTranslating = false,
-                        errorMessage = result.exceptionOrNull()?.message ?: "번역에 실패했어요"
-                    )
-                }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isTranslating = false,
-                    errorMessage = "메시지 전송 중 오류가 발생했어요"
+                    errorMessage = "번역에 실패했어요: ${e.message}"
                 )
             }
         }
@@ -112,51 +94,6 @@ class ChatViewModel @Inject constructor(
     }
     
     /**
-     * 모델 준비 상태 확인
-     */
-    private fun checkModelReadiness(chatId: String) {
-        viewModelScope.launch {
-            try {
-                val result = downloadModelUseCase.areModelsReadyForChat(chatId)
-                val isReady = result.getOrElse { false }
-                
-                _uiState.value = _uiState.value.copy(
-                    isModelReady = isReady,
-                    isDownloadingModel = !isReady
-                )
-                
-                // 모델이 준비되지 않았다면 다운로드 시작
-                if (!isReady) {
-                    _uiState.value = _uiState.value.copy(isDownloadingModel = true)
-                    
-                    val downloadResult = downloadModelUseCase.downloadModelsForChat(chatId, requireWifi = false)
-                    
-                    // 다운로드 완료 후 상태 재확인
-                    val reCheckResult = downloadModelUseCase.areModelsReadyForChat(chatId)
-                    val isReadyAfterDownload = reCheckResult.getOrElse { false }
-                    
-                    _uiState.value = _uiState.value.copy(
-                        isModelReady = isReadyAfterDownload,
-                        isDownloadingModel = !isReadyAfterDownload
-                    )
-                    
-                    // 만약 여전히 준비되지 않았다면 몇 초 후 다시 체크
-                    if (!isReadyAfterDownload) {
-                        kotlinx.coroutines.delay(3000)
-                        checkModelReadiness(chatId)
-                    }
-                }
-                
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isModelReady = false,
-                    isDownloadingModel = false
-                )
-            }
-        }
-    }
-    
-    /**
      * 에러 메시지 클리어
      */
     fun clearError() {
@@ -164,23 +101,15 @@ class ChatViewModel @Inject constructor(
     }
     
     /**
-     * 채팅방 클리어 (메시지 삭제)
+     * 채팅방 클리어
      */
     fun clearChat() {
         viewModelScope.launch {
             try {
                 val chatId = _currentChat.value?.id ?: return@launch
-                val result = chatManagementUseCase.clearChatMessages(chatId)
-                
-                if (result.isFailure) {
-                    _uiState.value = _uiState.value.copy(
-                        errorMessage = "채팅 기록 삭제에 실패했어요"
-                    )
-                }
+                chatUseCase.clearChatMessages(chatId)
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    errorMessage = "채팅 기록 삭제 중 오류가 발생했어요"
-                )
+                _uiState.value = _uiState.value.copy(errorMessage = "채팅 기록 삭제에 실패했어요")
             }
         }
     }
@@ -192,7 +121,6 @@ class ChatViewModel @Inject constructor(
 data class ChatUiState(
     val isTranslating: Boolean = false,
     val isModelReady: Boolean = false,
-    val isDownloadingModel: Boolean = false,
     val inputText: String = "",
     val errorMessage: String? = null
 ) 

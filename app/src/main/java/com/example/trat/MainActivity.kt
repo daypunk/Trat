@@ -12,7 +12,7 @@ import dagger.hilt.android.AndroidEntryPoint
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        // 스플래시 스크린 설치
+        // 스플래시
         installSplashScreen()
         
         super.onCreate(savedInstanceState)

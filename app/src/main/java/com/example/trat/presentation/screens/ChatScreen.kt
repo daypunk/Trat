@@ -170,13 +170,38 @@ fun ChatScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                // 로고 아이콘
-                                Icon(
-                                    painter = painterResource(id = R.drawable.logo),
-                                    contentDescription = "로고",
-                                    modifier = Modifier.size(20.dp),
-                                    tint = TossInputMessage
-                                )
+                                // 언어 뱃지
+                                currentChat?.let { chat ->
+                                    Card(
+                                        modifier = Modifier.clickable { showLanguageSettingsDialog = true },
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = TossInputMessage.copy(alpha = 0.1f)
+                                        ),
+                                        shape = RoundedCornerShape(16.dp),
+                                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Text(
+                                                text = getLanguageFlag(chat.nativeLanguage.code),
+                                                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp)
+                                            )
+                                            Text(
+                                                text = "↔",
+                                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                                                color = TossInputMessage,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                            Text(
+                                                text = getLanguageFlag(chat.translateLanguage.code),
+                                                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp)
+                                            )
+                                        }
+                                    }
+                                }
                                 
                                 // 간단한 채팅방 제목만 표시
                                 Text(
@@ -208,65 +233,52 @@ fun ChatScreen(
             )
         }
     ) { paddingValues ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // 언어 뱃지 영역 (fixed)
-            if (!isSearching) {
-                LanguageBadgeBar(
+            if (messages.isEmpty()) {
+                // 빈 채팅 상태
+                EmptyChatState(
                     currentChat = currentChat,
-                    onClick = { showLanguageSettingsDialog = true }
+                    isModelReady = uiState.isModelReady
                 )
-            }
-            
-            // 메인 콘텐츠 영역
-            Box(
-                modifier = Modifier.weight(1f)
-            ) {
-                if (messages.isEmpty()) {
-                    // 빈 채팅 상태
-                    EmptyChatState(
-                        currentChat = currentChat,
-                        isModelReady = uiState.isModelReady
-                    )
-                } else {
-                    // 메시지 목록
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(messages, key = { it.id }) { message ->
-                            MessageBubble(
-                                message = message,
-                                isHighlighted = searchResults.isNotEmpty() && 
-                                    searchResults.getOrNull(currentSearchIndex) == messages.indexOf(message),
-                                searchQuery = if (isSearching) searchQuery else ""
-                            )
-                        }
+            } else {
+                // 메시지 목록
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(messages, key = { it.id }) { message ->
+                        MessageBubble(
+                            message = message,
+                            isHighlighted = searchResults.isNotEmpty() && 
+                                searchResults.getOrNull(currentSearchIndex) == messages.indexOf(message),
+                            searchQuery = if (isSearching) searchQuery else ""
+                        )
                     }
                 }
+            }
+            
+            // 에러 메시지 표시
+            uiState.errorMessage?.let { error ->
+                LaunchedEffect(error) {
+                    kotlinx.coroutines.delay(3000)
+                    viewModel.clearError()
+                }
                 
-                // 에러 메시지 표시
-                uiState.errorMessage?.let { error ->
-                    LaunchedEffect(error) {
-                        kotlinx.coroutines.delay(3000)
-                        viewModel.clearError()
-                    }
-                    
-                    Snackbar(
-                        modifier = Modifier.align(Alignment.BottomCenter),
-                        action = {
-                            TextButton(onClick = { viewModel.clearError() }) {
-                                Text("확인")
-                            }
+                Snackbar(
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                    action = {
+                        TextButton(onClick = { viewModel.clearError() }) {
+                            Text("확인")
                         }
-                    ) {
-                        Text(error)
                     }
+                ) {
+                    Text(error)
                 }
             }
         }
@@ -337,6 +349,8 @@ fun ChatScreen(
                     // 현재 채팅의 타이틀과 언어 설정 업데이트
                     currentChat?.let { chat ->
                         mainViewModel.updateChatTitleAndLanguages(chat.id, title, nativeLanguage, translateLanguage)
+                        // ChatViewModel의 currentChat도 업데이트
+                        viewModel.refreshCurrentChat()
                     }
                 }
             )
@@ -525,7 +539,8 @@ private fun SearchTopAppBar(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp),
+                    .height(56.dp)
+                    .padding(vertical = 4.dp),
                 singleLine = true,
                 textStyle = MaterialTheme.typography.bodyMedium,
                 shape = RoundedCornerShape(12.dp),
@@ -584,11 +599,11 @@ private fun ChatMenuDrawer(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "💬 채팅",
-                style = MaterialTheme.typography.headlineSmall.copy(fontSize = 22.sp),
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+            Icon(
+                painter = painterResource(id = R.drawable.logo),
+                contentDescription = "로고",
+                modifier = Modifier.size(28.dp),
+                tint = Color.Unspecified  // 원본 색상 유지
             )
             
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -736,60 +751,5 @@ private fun ChatItemInMenu(
     }
 }
 
-@Composable
-private fun LanguageBadgeBar(
-    currentChat: Chat?,
-    onClick: () -> Unit
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 2.dp
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.Center
-        ) {
-            if (currentChat != null) {
-                Card(
-                    modifier = Modifier.clickable { onClick() },
-                    colors = CardDefaults.cardColors(
-                        containerColor = TossInputMessage.copy(alpha = 0.1f)
-                    ),
-                    shape = RoundedCornerShape(20.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = getLanguageFlag(currentChat.nativeLanguage.code),
-                            style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp)
-                        )
-                        Text(
-                            text = "↔",
-                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
-                            color = TossInputMessage,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Text(
-                            text = getLanguageFlag(currentChat.translateLanguage.code),
-                            style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp)
-                        )
-                        Text(
-                            text = "${currentChat.nativeLanguage.displayName} ↔ ${currentChat.translateLanguage.displayName}",
-                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                            color = TossInputMessage,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
+
 

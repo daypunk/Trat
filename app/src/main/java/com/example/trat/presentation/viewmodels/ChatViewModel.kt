@@ -73,6 +73,13 @@ class ChatViewModel @Inject constructor(
             
             try {
                 chatUseCase.sendMessage(chatId, inputText.trim())
+                
+                // 언어가 자동으로 변경되었을 수 있으므로 현재 채팅 정보를 다시 불러옴
+                val updatedChat = chatUseCase.getChatById(chatId)
+                if (updatedChat != null) {
+                    _currentChat.value = updatedChat
+                }
+                
                 _uiState.value = _uiState.value.copy(
                     isTranslating = false,
                     inputText = ""
@@ -98,6 +105,23 @@ class ChatViewModel @Inject constructor(
      */
     fun clearError() {
         _uiState.value = _uiState.value.copy(errorMessage = null)
+    }
+    
+    /**
+     * 현재 채팅 정보 새로고침 (언어 설정 변경 후 사용)
+     */
+    fun refreshCurrentChat() {
+        val chatId = _currentChat.value?.id ?: return
+        viewModelScope.launch {
+            try {
+                val updatedChat = chatUseCase.getChatById(chatId)
+                if (updatedChat != null) {
+                    _currentChat.value = updatedChat
+                }
+            } catch (e: Exception) {
+                // 에러 처리 (로그만 남기고 무시)
+            }
+        }
     }
     
     /**

@@ -89,15 +89,17 @@ class ChatUseCase @Inject constructor(
     suspend fun sendMessage(chatId: String, inputText: String): String {
         val chat = getChatById(chatId) ?: throw Exception("채팅방을 찾을 수 없습니다")
         
-        // 0. 언어 감지 및 자동 설정 변경
-        val detectedLanguage = LanguageDetector.detectLanguage(inputText)
+        // 0. 언어 감지 및 자동 설정 변경 (텍스트가 충분할 때만)
         var currentChat = chat
-        
-        if (LanguageDetector.isLanguageChangeNeeded(detectedLanguage, chat.nativeLanguage, chat.translateLanguage)) {
-            // 감지된 언어로 nativeLanguage 자동 변경
-            val updatedChat = chat.copy(nativeLanguage = detectedLanguage)
-            chatRepository.updateChat(updatedChat)
-            currentChat = updatedChat
+        if (inputText.trim().length >= 2) { // 최소 2글자 이상일 때만 언어 감지
+            val detectedLanguage = LanguageDetector.detectLanguage(inputText)
+            
+            if (LanguageDetector.isLanguageChangeNeeded(detectedLanguage, chat.nativeLanguage, chat.translateLanguage)) {
+                // 감지된 언어로 nativeLanguage 자동 변경
+                val updatedChat = chat.copy(nativeLanguage = detectedLanguage)
+                chatRepository.updateChat(updatedChat)
+                currentChat = updatedChat
+            }
         }
         
         // 1. 원본 메시지 저장

@@ -10,6 +10,7 @@ import com.example.trat.domain.usecase.DownloadLanguageModelUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import javax.inject.Inject
 
 @HiltViewModel
@@ -126,7 +127,24 @@ class ChatViewModel @Inject constructor(
                 
                 // 모델이 준비되지 않았다면 다운로드 시작
                 if (!isReady) {
-                    downloadModelUseCase.downloadModelsForChat(chatId, requireWifi = false)
+                    _uiState.value = _uiState.value.copy(isDownloadingModel = true)
+                    
+                    val downloadResult = downloadModelUseCase.downloadModelsForChat(chatId, requireWifi = false)
+                    
+                    // 다운로드 완료 후 상태 재확인
+                    val reCheckResult = downloadModelUseCase.areModelsReadyForChat(chatId)
+                    val isReadyAfterDownload = reCheckResult.getOrElse { false }
+                    
+                    _uiState.value = _uiState.value.copy(
+                        isModelReady = isReadyAfterDownload,
+                        isDownloadingModel = !isReadyAfterDownload
+                    )
+                    
+                    // 만약 여전히 준비되지 않았다면 몇 초 후 다시 체크
+                    if (!isReadyAfterDownload) {
+                        kotlinx.coroutines.delay(3000)
+                        checkModelReadiness(chatId)
+                    }
                 }
                 
             } catch (e: Exception) {

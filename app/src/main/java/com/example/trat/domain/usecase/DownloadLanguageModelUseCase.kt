@@ -4,13 +4,15 @@ import com.example.trat.data.models.SupportedLanguage
 import com.example.trat.domain.repository.ChatRepositoryInterface
 import com.example.trat.utils.Constants
 import com.example.trat.utils.LanguageModelManager
+import com.example.trat.services.TranslationService
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class DownloadLanguageModelUseCase @Inject constructor(
     private val languageModelManager: LanguageModelManager,
-    private val chatRepository: ChatRepositoryInterface
+    private val chatRepository: ChatRepositoryInterface,
+    private val translationService: TranslationService
 ) {
     
     /**
@@ -156,10 +158,20 @@ class DownloadLanguageModelUseCase @Inject constructor(
             val chat = chatRepository.getChatById(chatId)
                 ?: return Result.failure(Exception("채팅방을 찾을 수 없습니다"))
             
-            val nativeModelReady = languageModelManager.isModelDownloaded(chat.nativeLanguage)
-            val translateModelReady = languageModelManager.isModelDownloaded(chat.translateLanguage)
+            // 양방향 번역을 모두 확인
+            val forwardResult = translationService.downloadModelIfNeeded(
+                sourceLanguage = chat.nativeLanguage,
+                targetLanguage = chat.translateLanguage,
+                requireWifi = false
+            )
             
-            Result.success(nativeModelReady && translateModelReady)
+            val backwardResult = translationService.downloadModelIfNeeded(
+                sourceLanguage = chat.translateLanguage,
+                targetLanguage = chat.nativeLanguage,
+                requireWifi = false
+            )
+            
+            Result.success(forwardResult.isSuccess && backwardResult.isSuccess)
         } catch (e: Exception) {
             Result.failure(e)
         }

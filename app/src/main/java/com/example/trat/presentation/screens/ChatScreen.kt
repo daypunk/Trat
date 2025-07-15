@@ -170,16 +170,13 @@ fun ChatScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                // 번역 아이콘
-                                IconButton(
-                                    onClick = { showLanguageSettingsDialog = true }
-                                ) {
-                                    Icon(
-                                        Icons.Default.Settings,
-                                        contentDescription = "언어 설정",
-                                        tint = TossInputMessage
-                                    )
-                                }
+                                // 로고 아이콘
+                                Icon(
+                                    painter = painterResource(id = R.drawable.logo),
+                                    contentDescription = "로고",
+                                    modifier = Modifier.size(20.dp),
+                                    tint = TossInputMessage
+                                )
                                 
                                 // 간단한 채팅방 제목만 표시
                                 Text(
@@ -211,36 +208,48 @@ fun ChatScreen(
             )
         }
     ) { paddingValues ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            if (messages.isEmpty()) {
-                // 빈 채팅 상태
-                EmptyChatState(
+            // 언어 뱃지 영역 (fixed)
+            if (!isSearching) {
+                LanguageBadgeBar(
                     currentChat = currentChat,
-                        isModelReady = uiState.isModelReady
+                    onClick = { showLanguageSettingsDialog = true }
                 )
-            } else {
-                // 메시지 목록
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                        items(messages, key = { it.id }) { message ->
-                        MessageBubble(
-                            message = message,
-                                isHighlighted = searchResults.isNotEmpty() && 
-                                    searchResults.getOrNull(currentSearchIndex) == messages.indexOf(message),
-                            searchQuery = if (isSearching) searchQuery else ""
-                        )
-                    }
-                }
             }
             
+            // 메인 콘텐츠 영역
+            Box(
+                modifier = Modifier.weight(1f)
+            ) {
+                if (messages.isEmpty()) {
+                    // 빈 채팅 상태
+                    EmptyChatState(
+                        currentChat = currentChat,
+                        isModelReady = uiState.isModelReady
+                    )
+                } else {
+                    // 메시지 목록
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(messages, key = { it.id }) { message ->
+                            MessageBubble(
+                                message = message,
+                                isHighlighted = searchResults.isNotEmpty() && 
+                                    searchResults.getOrNull(currentSearchIndex) == messages.indexOf(message),
+                                searchQuery = if (isSearching) searchQuery else ""
+                            )
+                        }
+                    }
+                }
+                
                 // 에러 메시지 표시
                 uiState.errorMessage?.let { error ->
                     LaunchedEffect(error) {
@@ -261,6 +270,7 @@ fun ChatScreen(
                 }
             }
         }
+    }
         
         // 드로어가 열려있을 때 배경 오버레이
         if (showRightDrawer) {
@@ -507,10 +517,21 @@ private fun SearchTopAppBar(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = onSearchQueryChange,
-                placeholder = { Text("번역 메시지 검색...") },
-                modifier = Modifier.fillMaxWidth(),
+                placeholder = { 
+                    Text(
+                        "번역 메시지 검색...",
+                        style = MaterialTheme.typography.bodyMedium
+                    ) 
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
                 singleLine = true,
+                textStyle = MaterialTheme.typography.bodyMedium,
+                shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
+                    unfocusedBorderColor = TossGray300,
+                    focusedBorderColor = TossInputMessage,
                     unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                     focusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
                 )
@@ -710,6 +731,63 @@ private fun ChatItemInMenu(
                             shape = CircleShape
                         )
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LanguageBadgeBar(
+    currentChat: Chat?,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 2.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            if (currentChat != null) {
+                Card(
+                    modifier = Modifier.clickable { onClick() },
+                    colors = CardDefaults.cardColors(
+                        containerColor = TossInputMessage.copy(alpha = 0.1f)
+                    ),
+                    shape = RoundedCornerShape(20.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = getLanguageFlag(currentChat.nativeLanguage.code),
+                            style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp)
+                        )
+                        Text(
+                            text = "↔",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                            color = TossInputMessage,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = getLanguageFlag(currentChat.translateLanguage.code),
+                            style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp)
+                        )
+                        Text(
+                            text = "${currentChat.nativeLanguage.displayName} ↔ ${currentChat.translateLanguage.displayName}",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                            color = TossInputMessage,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
             }
         }
     }

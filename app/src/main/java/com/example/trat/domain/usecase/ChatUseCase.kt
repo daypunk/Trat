@@ -5,6 +5,7 @@ import com.example.trat.data.entities.Message
 import com.example.trat.data.models.SupportedLanguage
 import com.example.trat.domain.repository.ChatRepositoryInterface
 import com.example.trat.services.TranslationService
+import com.example.trat.utils.LanguageDetector
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
@@ -88,6 +89,17 @@ class ChatUseCase @Inject constructor(
     suspend fun sendMessage(chatId: String, inputText: String): String {
         val chat = getChatById(chatId) ?: throw Exception("채팅방을 찾을 수 없습니다")
         
+        // 0. 언어 감지 및 자동 설정 변경
+        val detectedLanguage = LanguageDetector.detectLanguage(inputText)
+        var currentChat = chat
+        
+        if (LanguageDetector.isLanguageChangeNeeded(detectedLanguage, chat.nativeLanguage, chat.translateLanguage)) {
+            // 감지된 언어로 nativeLanguage 자동 변경
+            val updatedChat = chat.copy(nativeLanguage = detectedLanguage)
+            chatRepository.updateChat(updatedChat)
+            currentChat = updatedChat
+        }
+        
         // 1. 원본 메시지 저장
         val originalMessage = Message(
             chatId = chatId,
@@ -97,8 +109,8 @@ class ChatUseCase @Inject constructor(
         )
         chatRepository.insertMessage(originalMessage)
         
-        // 2. 번역 수행
-        val translatedText = translateText(chat, inputText)
+        // 2. 번역 수행 (업데이트된 채팅 설정 사용)
+        val translatedText = translateText(currentChat, inputText)
         
         // 3. 번역문이 다르면 번역 메시지도 저장
         if (translatedText != inputText) {

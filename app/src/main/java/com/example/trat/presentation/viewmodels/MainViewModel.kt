@@ -17,7 +17,7 @@ import javax.inject.Inject
 class MainViewModel @Inject constructor(
     private val chatManagementUseCase: ChatManagementUseCase,
     private val languageModelManager: LanguageModelManager
-) : ViewModel() {
+) : BaseViewModel<MainUiState>() {
     
     // 채팅 목록
     val chats: StateFlow<List<Chat>> = chatManagementUseCase.getAllChats()
@@ -27,9 +27,9 @@ class MainViewModel @Inject constructor(
             initialValue = emptyList()
         )
     
-    // UI 상태
-    private val _uiState = MutableStateFlow(MainUiState())
-    val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
+    // UI 상태 
+    override val _uiState = MutableStateFlow(MainUiState())
+    override val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
     
     /**
      * 새 번역 생성
@@ -40,19 +40,11 @@ class MainViewModel @Inject constructor(
         translateLanguage: SupportedLanguage,
         onSuccess: (String) -> Unit
     ) {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
-            
-            try {
-                val chat = chatManagementUseCase.createChat(title, nativeLanguage, translateLanguage)
-                _uiState.value = _uiState.value.copy(isLoading = false)
-                onSuccess(chat.id)
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    errorMessage = "채팅방 생성에 실패했어요: ${e.message}"
-                )
-            }
+        launchSafely(
+            onError = { setError("채팅방 생성에 실패했어요: $it") }
+        ) {
+            val chat = chatManagementUseCase.createChat(title, nativeLanguage, translateLanguage)
+            onSuccess(chat.id)
         }
     }
     
@@ -60,12 +52,10 @@ class MainViewModel @Inject constructor(
      * 채팅방 삭제
      */
     fun deleteChat(chatId: String) {
-        viewModelScope.launch {
-            try {
-                chatManagementUseCase.deleteChat(chatId)
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(errorMessage = "채팅방 삭제에 실패했어요")
-            }
+        launchSimple(
+            onError = { setError("채팅방 삭제에 실패했어요") }
+        ) {
+            chatManagementUseCase.deleteChat(chatId)
         }
     }
     
@@ -78,13 +68,11 @@ class MainViewModel @Inject constructor(
         translateLanguage: SupportedLanguage,
         onComplete: (() -> Unit)? = null
     ) {
-        viewModelScope.launch {
-            try {
-                chatManagementUseCase.updateChatLanguages(chatId, nativeLanguage, translateLanguage)
-                onComplete?.invoke()
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(errorMessage = "언어 설정 업데이트에 실패했어요")
-            }
+        launchSimple(
+            onError = { setError("언어 설정 업데이트에 실패했어요") }
+        ) {
+            chatManagementUseCase.updateChatLanguages(chatId, nativeLanguage, translateLanguage)
+            onComplete?.invoke()
         }
     }
     
@@ -98,22 +86,15 @@ class MainViewModel @Inject constructor(
         translateLanguage: SupportedLanguage,
         onComplete: (() -> Unit)? = null
     ) {
-        viewModelScope.launch {
-            try {
-                chatManagementUseCase.updateChatTitleAndLanguages(chatId, title, nativeLanguage, translateLanguage)
-                onComplete?.invoke()
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(errorMessage = "설정 업데이트에 실패했어요")
-            }
+        launchSimple(
+            onError = { setError("설정 업데이트에 실패했어요") }
+        ) {
+            chatManagementUseCase.updateChatTitleAndLanguages(chatId, title, nativeLanguage, translateLanguage)
+            onComplete?.invoke()
         }
     }
     
-    /**
-     * 에러 메시지 클리어
-     */
-    fun clearError() {
-        _uiState.value = _uiState.value.copy(errorMessage = null)
-    }
+
     
     /**
      * 마지막 채팅방 ID 가져오기
@@ -141,51 +122,46 @@ class MainViewModel @Inject constructor(
      * 모든 언어 모델 다운로드
      */
     fun downloadAllModels(context: Context) {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                isDownloadingModels = true,
-                downloadProgress = 0f
-            )
+        launchSafely(
+            onStart = {
+                updateUiState {
+                    copy(isDownloadingModels = true, downloadProgress = 0f, errorMessage = null)
+                }
+            },
+            onError = { setError("모델 다운로드에 실패했어요: $it") },
+            onComplete = {
+                updateUiState {
+                    copy(
+                        isDownloadingModels = false,
+                        modelsDownloaded = true,
+                        downloadProgress = 1f,
+                        showModelDownloadDialog = false
+                    )
+                }
+            }
+        ) {
+            val allLanguages = SupportedLanguage.values()
+            val totalModels = allLanguages.size
             
-            try {
-                val allLanguages = SupportedLanguage.values()
-                val totalModels = allLanguages.size
+            Log.d("MainViewModel", "Starting download for all models: ${allLanguages.map { it.displayName }}")
+            
+            allLanguages.forEachIndexed { index, language ->
+                Log.d("MainViewModel", "Downloading model for ${language.displayName}")
                 
-                Log.d("MainViewModel", "Starting download for all models: ${allLanguages.map { it.displayName }}")
+                val result = languageModelManager.downloadModel(language, requireWifi = false)
                 
-                allLanguages.forEachIndexed { index, language ->
-                    Log.d("MainViewModel", "Downloading model for ${language.displayName}")
-                    
-                    val result = languageModelManager.downloadModel(language, requireWifi = false)
-                    
-                    if (result.isSuccess) {
-                        Log.d("MainViewModel", "Successfully downloaded ${language.displayName}")
-                    } else {
-                        Log.w("MainViewModel", "Failed to download ${language.displayName}: ${result.exceptionOrNull()?.message}")
-                    }
-                    
-                    // 진행률 업데이트
-                    val progress = (index + 1).toFloat() / totalModels
-                    _uiState.value = _uiState.value.copy(downloadProgress = progress)
+                if (result.isSuccess) {
+                    Log.d("MainViewModel", "Successfully downloaded ${language.displayName}")
+                } else {
+                    Log.w("MainViewModel", "Failed to download ${language.displayName}: ${result.exceptionOrNull()?.message}")
                 }
                 
-                Log.d("MainViewModel", "All models download completed")
-                
-                // 다운로드 완료 - 즉시 다이얼로그 닫기
-                _uiState.value = _uiState.value.copy(
-                    isDownloadingModels = false,
-                    modelsDownloaded = true,
-                    downloadProgress = 1f,
-                    showModelDownloadDialog = false
-                )
-                
-            } catch (e: Exception) {
-                Log.e("MainViewModel", "Error downloading models", e)
-                _uiState.value = _uiState.value.copy(
-                    isDownloadingModels = false,
-                    errorMessage = "모델 다운로드에 실패했어요: ${e.message}"
-                )
+                // 진행률 업데이트
+                val progress = (index + 1).toFloat() / totalModels
+                updateUiState { copy(downloadProgress = progress) }
             }
+            
+            Log.d("MainViewModel", "All models download completed")
         }
     }
     
@@ -193,19 +169,21 @@ class MainViewModel @Inject constructor(
      * 모델 다운로드 상태 초기화
      */
     fun resetModelDownloadState() {
-        _uiState.value = _uiState.value.copy(
-            showModelDownloadDialog = false,
-            isDownloadingModels = false,
-            modelsDownloaded = false,
-            downloadProgress = 0f
-        )
+        updateUiState {
+            copy(
+                showModelDownloadDialog = false,
+                isDownloadingModels = false,
+                modelsDownloaded = false,
+                downloadProgress = 0f
+            )
+        }
     }
     
     /**
      * 모델 다운로드 다이얼로그 표시 설정
      */
     fun setShowModelDownloadDialog(show: Boolean) {
-        _uiState.value = _uiState.value.copy(showModelDownloadDialog = show)
+        updateUiState { copy(showModelDownloadDialog = show) }
     }
 }
 
@@ -214,9 +192,13 @@ class MainViewModel @Inject constructor(
  */
 data class MainUiState(
     val isLoading: Boolean = false,
-    val errorMessage: String? = null,
+    override val errorMessage: String? = null,
     val showModelDownloadDialog: Boolean = false,
     val isDownloadingModels: Boolean = false,
     val modelsDownloaded: Boolean = false,
     val downloadProgress: Float = 0f
-) 
+) : BaseUiState {
+    override fun clearErrorMessage(): MainUiState = copy(errorMessage = null)
+    override fun setLoadingState(isLoading: Boolean): MainUiState = copy(isLoading = isLoading)
+    override fun setErrorMessage(message: String): MainUiState = copy(errorMessage = message)
+} 

@@ -26,7 +26,7 @@ Trat은 ML Kit을 활용한 **오프라인 실시간 번역 앱**입니다.
 - **성능 최적화**: 번역 캐싱, DB 인덱싱, Flow 최적화
 
 
-##Clean Architecture + MVVM
+## Clean Architecture + MVVM
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐

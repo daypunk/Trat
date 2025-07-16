@@ -1,4 +1,5 @@
-# Trat - 트랫. 졸라 빠른 번역기
+# Trat
+<img width="533" height="312" alt="Image" src="https://github.com/user-attachments/assets/a24d137e-ec8b-44f5-8ecc-aacf567e04e5" />
 
 ## 개요
 

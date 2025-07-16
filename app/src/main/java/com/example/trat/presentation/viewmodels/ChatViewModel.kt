@@ -100,25 +100,41 @@ class ChatViewModel @Inject constructor(
     }
     
     /**
-     * 음성 인식 시작
+     * 🟢 음성 인식 시작
      */
     fun startSpeechToText() {
-        val language = _currentChat.value?.nativeLanguage ?: return
+        android.util.Log.d("STT_DEBUG", "🟢 ChatViewModel.startSpeechToText() 호출됨")
+        val language = _currentChat.value?.nativeLanguage ?: run {
+            android.util.Log.d("STT_DEBUG", "❌ 언어 정보 없음 - 중단")
+            return
+        }
+        
         launchSimple(
-            onError = { setError("음성 인식 시작 중 오류가 발생했어요") }
+            onError = { 
+                android.util.Log.e("STT_DEBUG", "❌ 음성 인식 시작 오류: $it")
+                setError("음성 인식 시작 중 오류가 발생했어요: $it") 
+            }
         ) {
+            android.util.Log.d("STT_DEBUG", "🟢 speechToTextUseCase.startListening 호출 시작")
             speechToTextUseCase.startListening(language)
+            android.util.Log.d("STT_DEBUG", "🟢 speechToTextUseCase.startListening 완료")
         }
     }
     
     /**
-     * 음성 인식 중지
+     * 🔴 음성 인식 중지
      */
     fun stopSpeechToText() {
+        android.util.Log.d("STT_DEBUG", "🔴 ChatViewModel.stopSpeechToText() 호출됨")
         launchSimple(
-            onError = { setError("음성 인식 중지 중 오류가 발생했어요") }
+            onError = { 
+                android.util.Log.e("STT_DEBUG", "❌ 음성 인식 중지 오류: $it")
+                /* Repository에서 상태 관리하므로 에러 무시 */ 
+            }
         ) {
+            android.util.Log.d("STT_DEBUG", "🔴 speechToTextUseCase.stopListening 호출 시작")
             speechToTextUseCase.stopListening()
+            android.util.Log.d("STT_DEBUG", "🔴 speechToTextUseCase.stopListening 완료")
         }
     }
     

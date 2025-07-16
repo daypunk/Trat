@@ -27,8 +27,13 @@ class SpeechToTextRepository @Inject constructor(
 ) : SpeechToTextRepositoryInterface {
     
     private var speechRecognizer: SpeechRecognizer? = null
-    private val speechMutex = Mutex() // 동시 접근 제어를 위한 Mutex
+    private val speechMutex = Mutex()
     private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    
+    // 🎯 심플한 상태 관리
+    private var isActive = false
+    private var timeoutJob: kotlinx.coroutines.Job? = null
+    private var silenceTimeoutJob: kotlinx.coroutines.Job? = null
     
     private val _isListening = MutableStateFlow(false)
     override val isListening: StateFlow<Boolean> = _isListening.asStateFlow()
@@ -40,22 +45,30 @@ class SpeechToTextRepository @Inject constructor(
     override val error: StateFlow<String?> = _error.asStateFlow()
     
     override suspend fun startListening(languageCode: String) = speechMutex.withLock {
+        android.util.Log.d("STT_DEBUG", "🟢 Repository.startListening 호출됨 - isActive: $isActive")
+        // 🚫 이미 활성화된 상태면 무시
+        if (isActive) {
+            android.util.Log.d("STT_DEBUG", "🚫 이미 활성화 상태 - 무시")
+            return@withLock
+        }
+        
         if (!SpeechRecognizer.isRecognitionAvailable(context)) {
+            android.util.Log.e("STT_DEBUG", "❌ 음성 인식 사용 불가")
             _error.value = "음성 인식을 사용할 수 없습니다"
             return@withLock
         }
         
-        // 이미 인식 중이면 중복 실행 방지
-        if (_isListening.value) {
-            return@withLock
-        }
+        // 🎯 상태 활성화
+        android.util.Log.d("STT_DEBUG", "🎯 상태 활성화 시작")
+        isActive = true
+        _isListening.value = true
+        _error.value = null
+        _recognizedText.value = ""
         
-        // 기존 인스턴스 완전 정리
-        cleanup()
+        // 6초 타임아웃 시작
+        startNoInputTimeout()
         
-        // 약간의 딜레이 후 새 인스턴스 생성 (안드로이드 내부 정리 시간 확보)
-        kotlinx.coroutines.delay(100)
-        
+        // 음성 인식 시작
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
         speechRecognizer?.setRecognitionListener(recognitionListener)
         
@@ -67,15 +80,39 @@ class SpeechToTextRepository @Inject constructor(
             putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
         }
         
-        _isListening.value = true
-        _error.value = null
-        _recognizedText.value = ""
+        android.util.Log.d("STT_DEBUG", "🎙️ SpeechRecognizer.startListening 호출")
         speechRecognizer?.startListening(intent)
+        android.util.Log.d("STT_DEBUG", "✅ Repository.startListening 완료")
     }
     
     override suspend fun stopListening() = speechMutex.withLock {
-        speechRecognizer?.stopListening()
+        android.util.Log.d("STT_DEBUG", "🔴 Repository.stopListening 호출됨 - isActive: $isActive")
+        // 🚫 이미 비활성화된 상태면 무시
+        if (!isActive) {
+            android.util.Log.d("STT_DEBUG", "🚫 이미 비활성화 상태 - 무시")
+            return@withLock
+        }
+        
+        // 🎯 즉시 비활성화 (콜백 차단)
+        android.util.Log.d("STT_DEBUG", "🎯 즉시 비활성화 시작")
+        isActive = false
         _isListening.value = false
+        
+        // 모든 작업 정리
+        android.util.Log.d("STT_DEBUG", "🧹 타임아웃 작업 정리")
+        timeoutJob?.cancel()
+        silenceTimeoutJob?.cancel()
+        
+        // 강제 중지 및 정리
+        android.util.Log.d("STT_DEBUG", "🛑 SpeechRecognizer 중지 및 정리")
+        speechRecognizer?.cancel()
+        speechRecognizer?.destroy()
+        speechRecognizer = null
+        
+        // 상태 리셋
+        timeoutJob = null
+        silenceTimeoutJob = null
+        android.util.Log.d("STT_DEBUG", "✅ Repository.stopListening 완료")
     }
     
     override fun clearRecognizedText() {
@@ -86,67 +123,115 @@ class SpeechToTextRepository @Inject constructor(
         _error.value = null
     }
     
-    private suspend fun cleanupWithLock() = speechMutex.withLock {
-        cleanup()
+    // 6초 무입력 타임아웃
+    private fun startNoInputTimeout() {
+        timeoutJob?.cancel()
+        android.util.Log.d("STT_DEBUG", "⏰ 6초 무입력 타임아웃 시작 (음성 없으면 자동 종료)")
+        timeoutJob = repositoryScope.launch {
+            kotlinx.coroutines.delay(6000) // 6초
+            android.util.Log.d("STT_DEBUG", "⏰ 6초 무입력 타임아웃 발생 - 자동 종료")
+            stopListening()
+        }
     }
     
-    private fun cleanup() {
-        speechRecognizer?.destroy()
-        speechRecognizer = null
-        _isListening.value = false
+    // 2초 침묵 타임아웃 (음성 입력 후)
+    private fun startSilenceTimeout() {
+        silenceTimeoutJob?.cancel()
+        android.util.Log.d("STT_DEBUG", "🤫 2초 침묵 타임아웃 시작 (말 끝나면 2초 후 자동 종료)")
+        silenceTimeoutJob = repositoryScope.launch {
+            kotlinx.coroutines.delay(2000) // 2초
+            android.util.Log.d("STT_DEBUG", "🤫 2초 침묵 타임아웃 발생 - 자동 종료")
+            stopListening()
+        }
     }
     
     private val recognitionListener = object : RecognitionListener {
         override fun onReadyForSpeech(params: Bundle?) {
-            _isListening.value = true
+            android.util.Log.d("STT_DEBUG", "🎤 onReadyForSpeech - isActive: $isActive")
+            // 이미 활성화된 상태이므로 아무것도 하지 않음
         }
         
-        override fun onBeginningOfSpeech() {}
+        override fun onBeginningOfSpeech() {
+            android.util.Log.d("STT_DEBUG", "🗣️ onBeginningOfSpeech - isActive: $isActive")
+            if (!isActive) {
+                android.util.Log.d("STT_DEBUG", "🛡️ 비활성화 상태 - onBeginningOfSpeech 무시")
+                return // 🛡️ 비활성화된 상태면 무시
+            }
+            
+            // 음성 입력 시작 - 6초 타임아웃 취소
+            android.util.Log.d("STT_DEBUG", "🗣️ 음성 감지됨 - 6초 무입력 타임아웃 취소 (정상)")
+            timeoutJob?.cancel()
+        }
         
         override fun onRmsChanged(rmsdB: Float) {}
         
         override fun onBufferReceived(buffer: ByteArray?) {}
         
         override fun onEndOfSpeech() {
-            _isListening.value = false
+            android.util.Log.d("STT_DEBUG", "🤐 onEndOfSpeech - isActive: $isActive")
+            if (!isActive) {
+                android.util.Log.d("STT_DEBUG", "🛡️ 비활성화 상태 - onEndOfSpeech 무시")
+                return // 🛡️ 비활성화된 상태면 무시
+            }
+            
+            // 음성 입력 끝 - 2초 침묵 타임아웃 시작
+            android.util.Log.d("STT_DEBUG", "🤐 음성 입력 끝 감지 - 2초 침묵 타임아웃 전환")
+            startSilenceTimeout()
         }
         
         override fun onError(error: Int) {
-            _isListening.value = false
-            val errorMessage = when (error) {
-                SpeechRecognizer.ERROR_AUDIO -> "오디오 오류"
-                SpeechRecognizer.ERROR_CLIENT -> "클라이언트 오류"
-                SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "권한이 없습니다"
-                SpeechRecognizer.ERROR_NETWORK -> "네트워크 오류"
-                SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "네트워크 시간 초과"
-                SpeechRecognizer.ERROR_NO_MATCH -> "음성을 인식할 수 없습니다"
-                SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "음성 인식기가 사용 중입니다"
-                SpeechRecognizer.ERROR_SERVER -> "서버 오류"
-                SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "음성 입력 시간 초과"
-                else -> "알 수 없는 오류"
+            android.util.Log.d("STT_DEBUG", "❌ onError 호출됨 - error: $error, isActive: $isActive")
+            if (!isActive) {
+                android.util.Log.d("STT_DEBUG", "🛡️ 비활성화 상태 - onError 무시")
+                return // 🛡️ 비활성화된 상태면 무시
             }
-            _error.value = errorMessage
-            // 에러 발생 후 리소스 정리
-            repositoryScope.launch {
-                cleanupWithLock()
+            
+            // ERROR_NO_MATCH는 정상 상황 (에러 아님)
+            if (error != SpeechRecognizer.ERROR_NO_MATCH) {
+                val errorMessage = when (error) {
+                    SpeechRecognizer.ERROR_AUDIO -> "오디오 오류"
+                    SpeechRecognizer.ERROR_CLIENT -> "클라이언트 오류"
+                    SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "권한이 없습니다"
+                    SpeechRecognizer.ERROR_NETWORK -> "네트워크 오류"
+                    SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "네트워크 시간 초과"
+                    SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "음성 인식기가 사용 중입니다"
+                    SpeechRecognizer.ERROR_SERVER -> "서버 오류"
+                    SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "음성 입력 시간 초과"
+                    else -> "알 수 없는 오류"
+                }
+                android.util.Log.e("STT_DEBUG", "💥 에러 메시지 설정: $errorMessage")
+                _error.value = errorMessage
+            } else {
+                android.util.Log.d("STT_DEBUG", "🔕 ERROR_NO_MATCH - 정상 상황")
             }
+            
+            // 에러 시 자동 중지
+            android.util.Log.d("STT_DEBUG", "🔄 에러로 인한 자동 중지 시작")
+            repositoryScope.launch { stopListening() }
         }
         
         override fun onResults(results: Bundle?) {
-            _isListening.value = false
+            android.util.Log.d("STT_DEBUG", "📝 onResults 호출됨 - isActive: $isActive")
+            if (!isActive) {
+                android.util.Log.d("STT_DEBUG", "🛡️ 비활성화 상태 - onResults 무시")
+                return // 🛡️ 비활성화된 상태면 무시
+            }
+            
+            // 인식 결과 처리
             val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
             if (!matches.isNullOrEmpty()) {
+                android.util.Log.d("STT_DEBUG", "✅ 인식 결과: ${matches[0]}")
                 _recognizedText.value = matches[0]
+            } else {
+                android.util.Log.d("STT_DEBUG", "🔍 인식 결과 없음")
             }
-            // 인식 완료 후 리소스 정리
-            repositoryScope.launch {
-                cleanupWithLock()
-            }
+            
+            // 결과 처리 후 자동 중지
+            android.util.Log.d("STT_DEBUG", "🔄 결과 처리 후 자동 중지 시작")
+            repositoryScope.launch { stopListening() }
         }
         
-        override fun onPartialResults(partialResults: Bundle?) {
-            // 실시간 결과 처리 (선택사항)
-        }
+        override fun onPartialResults(partialResults: Bundle?) {}
         
         override fun onEvent(eventType: Int, params: Bundle?) {}
     }

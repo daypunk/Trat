@@ -58,6 +58,15 @@ import androidx.core.content.ContextCompat
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.compose.runtime.DisposableEffect
+import android.widget.PopupWindow
+import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
+import androidx.compose.ui.unit.IntOffset
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -471,7 +480,7 @@ private fun EmptyChatState(
                 }
                 
                 else -> {
-                    // 로티 애니메이션 (지구본 대신)
+                    // 로티 애니메이션
                     LottieAnimation(
                         composition = composition,
                         progress = { progress },
@@ -502,27 +511,38 @@ private fun ChatInputBar(
 ) {
     val context = LocalContext.current
     
-    // 마이크 클릭 시 즉시 피드백을 위한 로컬 상태
-    var showPopoverImmediately by remember { mutableStateOf(false) }
+    // 🎯 마이크 버튼 디바운싱을 위한 상태
+    var lastClickTime by remember { mutableStateOf(0L) }
+    val debounceDelay = 300L // 0.3초 디바운싱
     
-    // 권한 요청 런처
+    // 🎯 권한 요청 런처
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
             onStartSpeechToText()
         } else {
-            showPopoverImmediately = false // 권한 거부 시 팝오버 숨김
             Toast.makeText(context, "음성 인식을 위해 마이크 권한이 필요합니다", Toast.LENGTH_SHORT).show()
         }
     }
     
-    // isListening 상태 변화 감지하여 로컬 상태 동기화
-    LaunchedEffect(isListening) {
-        if (!isListening) {
-            showPopoverImmediately = false
+    // 🧹 화면 종료 시 정리
+    DisposableEffect(Unit) {
+        onDispose {
+            if (isListening) onStopSpeechToText()
         }
     }
+    
+    // 🎯 음성 인식 중일 때만 팝업 표시
+    if (isListening) {
+        SpeechRecognitionLoadingPopup(
+            onDismiss = {
+                android.util.Log.d("STT_DEBUG", "🔄 Popup onDismiss 호출됨")
+                onStopSpeechToText()
+            }
+        )
+    }
+    
     Surface(
         color = MaterialTheme.colorScheme.surface,
         shadowElevation = 8.dp,
@@ -532,12 +552,11 @@ private fun ChatInputBar(
                 spotColor = Color.Black.copy(alpha = 0.3f),
                 ambientColor = Color.Black.copy(alpha = 0.15f)
             )
-            .windowInsetsPadding(WindowInsets.navigationBars)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp),
+                .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 36.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -556,65 +575,63 @@ private fun ChatInputBar(
                     focusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
                 ),
                 trailingIcon = {
+                    // 고정된 크기의 컨테이너로 아이콘 위치 일관성 보장
                     Box(
+                        modifier = Modifier.size(48.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         IconButton(
                             onClick = {
+                                val currentTime = System.currentTimeMillis()
+                                android.util.Log.d("STT_DEBUG", "🎯 마이크 버튼 클릭 시도 - 경과시간: ${currentTime - lastClickTime}ms")
+                                
+                                // 🛡️ 디바운싱 체크
+                                if (currentTime - lastClickTime < debounceDelay) {
+                                    android.util.Log.d("STT_DEBUG", "⏳ 디바운싱 - 클릭 무시 (${currentTime - lastClickTime}ms < ${debounceDelay}ms)")
+                                    return@IconButton
+                                }
+                                lastClickTime = currentTime
+                                
+                                android.util.Log.d("STT_DEBUG", "🎯 마이크 버튼 클릭 처리 - isListening: $isListening, isTranslating: $isTranslating, isModelReady: $isModelReady")
                                 if (isListening) {
+                                    // 🔴 mic_off 기능: 즉시 중지
+                                    android.util.Log.d("STT_DEBUG", "🔴 음성 인식 중지 실행")
                                     onStopSpeechToText()
-                                } else {
-                                    // 권한 확인 후 음성 인식 시작
+                                } else if (!isTranslating && isModelReady) {
+                                    // 🟢 mic 기능: 음성 인식 시작
+                                    android.util.Log.d("STT_DEBUG", "🟢 음성 인식 시작 시도")
                                     when (ContextCompat.checkSelfPermission(
                                         context,
                                         Manifest.permission.RECORD_AUDIO
                                     )) {
                                         PackageManager.PERMISSION_GRANTED -> {
-                                            showPopoverImmediately = true // 즉시 팝오버 표시
+                                            android.util.Log.d("STT_DEBUG", "✅ 권한 확인됨 - 음성 인식 시작")
                                             onStartSpeechToText()
                                         }
                                         else -> {
-                                            showPopoverImmediately = true // 권한 요청 중에도 팝오버 표시
+                                            android.util.Log.d("STT_DEBUG", "❌ 권한 없음 - 권한 요청")
                                             permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                                         }
                                     }
+                                } else {
+                                    android.util.Log.d("STT_DEBUG", "⏸️ 조건 불충족 - 아무 작업 안 함")
                                 }
                             },
                             enabled = !isTranslating && isModelReady,
-                            modifier = Modifier.size(48.dp) // 고정 크기로 위치 일관성 보장
+                            modifier = Modifier.size(24.dp) // 아이콘 버튼 자체의 크기
                         ) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier.size(20.dp) // 아이콘 영역 고정
-                            ) {
-                                Icon(
-                                    painter = painterResource(
-                                        id = if (isListening) R.drawable.ic_mic_off else R.drawable.ic_mic
-                                    ),
-                                    contentDescription = if (isListening) "음성 인식 중지" else "음성 인식 시작",
-                                    tint = if (isListening) {
-                                        MaterialTheme.colorScheme.error
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                                    },
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
-                        
-                        // 음성 인식 중 popover - 클릭 즉시 또는 인식 중에 표시
-                        androidx.compose.animation.AnimatedVisibility(
-                            visible = isListening || showPopoverImmediately,
-                            enter = slideInVertically(
-                                initialOffsetY = { it },
-                                animationSpec = tween(300)
-                            ) + fadeIn(animationSpec = tween(300)),
-                            exit = slideOutVertically(
-                                targetOffsetY = { it },
-                                animationSpec = tween(300)
-                            ) + fadeOut(animationSpec = tween(300))
-                        ) {
-                            SpeechRecognitionPopover()
+                            Icon(
+                                painter = painterResource(
+                                    id = if (isListening) R.drawable.ic_mic_off else R.drawable.ic_mic
+                                ),
+                                contentDescription = if (isListening) "녹음 중지" else "녹음 시작",
+                                tint = if (isListening) {
+                                    MaterialTheme.colorScheme.error  // 🔴 중지 상태
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)  // 🎙️ 대기 상태
+                                },
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
                     }
                 }
@@ -652,7 +669,9 @@ private fun ChatInputBar(
 }
 
 @Composable
-private fun SpeechRecognitionPopover() {
+private fun SpeechRecognitionLoadingPopup(
+    onDismiss: () -> Unit = {}
+) {
     // 로딩 애니메이션 설정
     val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.loading_lottie))
     val progress by animateLottieCompositionAsState(
@@ -660,27 +679,37 @@ private fun SpeechRecognitionPopover() {
         iterations = LottieConstants.IterateForever
     )
     
-    Card(
-        modifier = Modifier
-            .offset(y = (-76).dp, x = (-12).dp) // 마이크 아이콘 중앙에 맞춤
-            .size(72.dp, 40.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color(0xFF4CAF50).copy(alpha = 0.12f) // 옅은 그린
-        ),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    Popup(
+        onDismissRequest = {
+            android.util.Log.d("STT_DEBUG", "🔄 Popup onDismissRequest 호출됨")
+            onDismiss()
+        },
+        alignment = Alignment.BottomCenter,
+        offset = IntOffset(0, -320), // 더 위쪽으로 이동
+        properties = PopupProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = false, // 🛡️ 외부 클릭으로 dismiss 방지 (터치 이벤트 전파 차단)
+            usePlatformDefaultWidth = false
+        )
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(8.dp),
-            contentAlignment = Alignment.Center
+        Card(
+            modifier = Modifier.size(width = 60.dp, height = 48.dp), // 높이 줄임
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            shape = RoundedCornerShape(12.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
         ) {
-            LottieAnimation(
-                composition = composition,
-                progress = { progress },
-                modifier = Modifier.size(24.dp)
-            )
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                LottieAnimation(
+                    composition = composition,
+                    progress = { progress },
+                    modifier = Modifier.size(52.dp) // 애니메이션 크기 증가
+                )
+            }
         }
     }
 }
@@ -954,6 +983,7 @@ private fun ChatItemInMenu(
         }
     }
 }
+
 
 
 

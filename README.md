@@ -45,7 +45,7 @@ Trat은 ML Kit을 활용한 **오프라인 실시간 번역 앱**입니다.
 **Architecture Components**
 - **Hilt**: 의존성 주입 (Dependency Injection)
 - **Room**: 로컬 데이터베이스 (SQLite 기반)
-- **ViewModel & LiveData**: MVVM 패턴
+- **ViewModel & StateFlow**: MVVM 패턴
 - **Navigation Component**: 화면 전환 관리
 
 **번역 & AI**
@@ -157,8 +157,7 @@ di/
 - 중복 코드 제거
 - 일관된 코딩 스타일
 
-## STT
-
+## STT (Speech-to-Text)
 
 ### 아키텍처 구현
 ```kotlin
@@ -176,8 +175,8 @@ class ChatViewModel                       // Presentation Layer
 ```kotlin
 // LRU 캐시를 활용한 메모리 + 디스크 캐싱
 class TranslationCacheService {
-    private val memoryCache = LruCache<String, String>(100)
-    private val diskCache = DataStore // 영구 저장
+    private val memoryCache = LinkedHashMap<String, String>(100, 0.75f, true)
+    private val dataStore = context.translationCacheDataStore // DataStore 기반 디스크 캐시
 }
 ```
 
@@ -207,9 +206,9 @@ class ChatViewModel : BaseViewModel() {
 ### 요구사항
 - **Android Studio**: Flamingo 이상
 - **Minimum SDK**: 24 (Android 7.0)
-- **Target SDK**: 34 (Android 14)
-- **Kotlin**: 1.9.0
-- **Compose**: 2024.02.00
+- **Target SDK**: 35 (Android 15)
+- **Kotlin**: 2.0.21
+- **Compose**: 2024.09.00
 
 ### 빌드 명령어
 ```bash
@@ -234,7 +233,7 @@ class ChatViewModel : BaseViewModel() {
 - Compose를 활용한 선언형 UI
 - Room을 통한 로컬 데이터베이스 관리
 - Navigation Component로 화면 전환
-- ViewModel과 LiveData로 상태 관리
+- ViewModel과 StateFlow로 상태 관리
 
 ### 3. 현대적 프로그래밍 기법
 - Coroutines와 Flow를 통한 비동기 처리

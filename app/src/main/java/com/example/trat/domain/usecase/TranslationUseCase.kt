@@ -1,0 +1,127 @@
+package com.example.trat.domain.usecase
+
+import android.util.Log
+import com.example.trat.data.models.SupportedLanguage
+import com.example.trat.services.TranslationService
+import com.example.trat.utils.LanguageModelManager
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * 번역 로직을 담당하는 UseCase
+ * - 텍스트 번역 수행
+ * - 번역 결과 검증
+ * - 모델 상태 확인
+ */
+@Singleton
+class TranslationUseCase @Inject constructor(
+    private val translationService: TranslationService,
+    private val languageModelManager: LanguageModelManager
+) {
+    
+    /**
+     * 텍스트를 번역하고 결과를 반환
+     */
+    suspend fun translateText(
+        inputText: String,
+        sourceLanguage: SupportedLanguage,
+        targetLanguage: SupportedLanguage
+    ): String {
+        Log.d("TranslationUseCase", "Translation: ${sourceLanguage.displayName} → ${targetLanguage.displayName}")
+        
+        // 번역 수행
+        val result = translationService.translate(inputText, sourceLanguage, targetLanguage)
+        
+        return if (result.isSuccess) {
+            val translation = result.getOrNull()
+            // 번역이 성공하고 원본과 다르면 번역 결과 반환, 아니면 원본 반환
+            if (translation != null && isDifferentEnough(inputText, translation)) {
+                translation
+            } else {
+                inputText
+            }
+        } else {
+            // 번역 실패 시 에러를 던져서 상위에서 처리하도록 함
+            throw Exception(result.exceptionOrNull()?.message ?: "번역에 실패했습니다")
+        }
+    }
+    
+    /**
+     * 번역 결과가 원본과 충분히 다른지 검증
+     */
+    fun isDifferentEnough(original: String, translated: String): Boolean {
+        if (original == translated) return false
+        
+        // 언어별 문자 범위 체크
+        val originalHasKorean = original.any { it in '\uAC00'..'\uD7AF' }
+        val originalHasJapanese = original.any { it in '\u3040'..'\u309F' || it in '\u30A0'..'\u30FF' || it in '\u4E00'..'\u9FAF' }
+        val originalHasEnglish = original.any { it in 'A'..'Z' || it in 'a'..'z' }
+        val originalHasChinese = original.any { it in '\u4E00'..'\u9FAF' }
+        
+        val translatedHasKorean = translated.any { it in '\uAC00'..'\uD7AF' }
+        val translatedHasJapanese = translated.any { it in '\u3040'..'\u309F' || it in '\u30A0'..'\u30FF' || it in '\u4E00'..'\u9FAF' }
+        val translatedHasEnglish = translated.any { it in 'A'..'Z' || it in 'a'..'z' }
+        val translatedHasChinese = translated.any { it in '\u4E00'..'\u9FAF' }
+        
+        // 언어 조합이 바뀌었으면 번역된 것으로 간주
+        return (originalHasKorean != translatedHasKorean) ||
+               (originalHasJapanese != translatedHasJapanese) ||
+               (originalHasEnglish != translatedHasEnglish) ||
+               (originalHasChinese != translatedHasChinese) ||
+               // 텍스트 길이가 많이 다르면 번역된 것으로 간주 (20% 이상 차이)
+               (kotlin.math.abs(original.length - translated.length).toFloat() / original.length > 0.2f)
+    }
+    
+    /**
+     * 특정 언어 쌍의 모델이 다운로드되어 있는지 확인
+     */
+    suspend fun areModelsDownloaded(
+        nativeLanguage: SupportedLanguage,
+        translateLanguage: SupportedLanguage
+    ): Boolean {
+        val nativeModelDownloaded = languageModelManager.isModelDownloaded(nativeLanguage)
+        val translateModelDownloaded = languageModelManager.isModelDownloaded(translateLanguage)
+        
+        Log.d("TranslationUseCase", "Model status: ${nativeLanguage.displayName} = $nativeModelDownloaded, ${translateLanguage.displayName} = $translateModelDownloaded")
+        
+        return nativeModelDownloaded && translateModelDownloaded
+    }
+    
+    /**
+     * 필요한 모델들을 다운로드
+     */
+    suspend fun downloadModelsIfNeeded(
+        nativeLanguage: SupportedLanguage,
+        translateLanguage: SupportedLanguage
+    ): Boolean {
+        Log.d("TranslationUseCase", "Downloading models for: ${nativeLanguage.displayName} ↔ ${translateLanguage.displayName}")
+        
+        val result1 = translationService.downloadModelIfNeeded(nativeLanguage, translateLanguage)
+        val result2 = translationService.downloadModelIfNeeded(translateLanguage, nativeLanguage)
+        
+        Log.d("TranslationUseCase", "Download results: result1=${result1.isSuccess}, result2=${result2.isSuccess}")
+        
+        if (result1.isFailure) {
+            Log.w("TranslationUseCase", "Download failed 1: ${result1.exceptionOrNull()?.message}")
+        }
+        if (result2.isFailure) {
+            Log.w("TranslationUseCase", "Download failed 2: ${result2.exceptionOrNull()?.message}")
+        }
+        
+        return result1.isSuccess && result2.isSuccess
+    }
+    
+    /**
+     * 번역 가능 여부 확인 (모델 상태 + 네트워크 상태 고려)
+     */
+    suspend fun canTranslate(
+        sourceLanguage: SupportedLanguage,
+        targetLanguage: SupportedLanguage
+    ): Boolean {
+        // 동일한 언어면 번역 불필요
+        if (sourceLanguage == targetLanguage) return false
+        
+        // 모델 다운로드 상태 확인
+        return areModelsDownloaded(sourceLanguage, targetLanguage)
+    }
+} 

@@ -6,7 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.trat.data.entities.Chat
 import com.example.trat.data.models.SupportedLanguage
-import com.example.trat.domain.usecase.ChatUseCase
+import com.example.trat.domain.usecase.ChatManagementUseCase
 import com.example.trat.utils.LanguageModelManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -15,12 +15,12 @@ import javax.inject.Inject
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
-    private val chatUseCase: ChatUseCase,
+    private val chatManagementUseCase: ChatManagementUseCase,
     private val languageModelManager: LanguageModelManager
 ) : ViewModel() {
     
     // 채팅 목록
-    val chats: StateFlow<List<Chat>> = chatUseCase.getAllChats()
+    val chats: StateFlow<List<Chat>> = chatManagementUseCase.getAllChats()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -44,7 +44,7 @@ class MainViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
             
             try {
-                val chat = chatUseCase.createChat(title, nativeLanguage, translateLanguage)
+                val chat = chatManagementUseCase.createChat(title, nativeLanguage, translateLanguage)
                 _uiState.value = _uiState.value.copy(isLoading = false)
                 onSuccess(chat.id)
             } catch (e: Exception) {
@@ -62,7 +62,7 @@ class MainViewModel @Inject constructor(
     fun deleteChat(chatId: String) {
         viewModelScope.launch {
             try {
-                chatUseCase.deleteChat(chatId)
+                chatManagementUseCase.deleteChat(chatId)
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(errorMessage = "채팅방 삭제에 실패했어요")
             }
@@ -80,7 +80,7 @@ class MainViewModel @Inject constructor(
     ) {
         viewModelScope.launch {
             try {
-                chatUseCase.updateChatLanguages(chatId, nativeLanguage, translateLanguage)
+                chatManagementUseCase.updateChatLanguages(chatId, nativeLanguage, translateLanguage)
                 onComplete?.invoke()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(errorMessage = "언어 설정 업데이트에 실패했어요")
@@ -100,7 +100,7 @@ class MainViewModel @Inject constructor(
     ) {
         viewModelScope.launch {
             try {
-                chatUseCase.updateChatTitleAndLanguages(chatId, title, nativeLanguage, translateLanguage)
+                chatManagementUseCase.updateChatTitleAndLanguages(chatId, title, nativeLanguage, translateLanguage)
                 onComplete?.invoke()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(errorMessage = "설정 업데이트에 실패했어요")

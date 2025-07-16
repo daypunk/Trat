@@ -5,7 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.trat.data.entities.Chat
 import com.example.trat.data.entities.Message
-import com.example.trat.domain.usecase.ChatUseCase
+import com.example.trat.domain.usecase.ChatManagementUseCase
+import com.example.trat.domain.usecase.MessageUseCase
+import com.example.trat.domain.usecase.MessageTranslationUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -13,7 +15,9 @@ import javax.inject.Inject
 
 @HiltViewModel
 class ChatViewModel @Inject constructor(
-    private val chatUseCase: ChatUseCase
+    private val chatManagementUseCase: ChatManagementUseCase,
+    private val messageUseCase: MessageUseCase,
+    private val messageTranslationUseCase: MessageTranslationUseCase
 ) : ViewModel() {
     
     // UI 상태
@@ -34,7 +38,7 @@ class ChatViewModel @Inject constructor(
     fun initializeChat(chatId: String) {
         viewModelScope.launch {
             try {
-                val chat = chatUseCase.getChatById(chatId)
+                val chat = chatManagementUseCase.getChatById(chatId)
                 if (chat != null) {
                     _currentChat.value = chat
                     
@@ -42,7 +46,7 @@ class ChatViewModel @Inject constructor(
                     _uiState.value = _uiState.value.copy(isModelReady = true)
                     
                     // 메시지 로드
-                    chatUseCase.getMessagesForChat(chatId).collect { messageList ->
+                    messageUseCase.getMessagesForChat(chatId).collect { messageList ->
                         _messages.value = messageList
                     }
                 } else {
@@ -66,7 +70,7 @@ class ChatViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isTranslating = true, errorMessage = null)
             
             try {
-                chatUseCase.sendMessage(chatId, inputText.trim())
+                messageTranslationUseCase.sendMessage(chatId, inputText.trim())
                 
                 // 메시지 전송 후 채팅 정보 새로고침 (언어 감지로 인한 변경사항 반영)
                 refreshCurrentChat()
@@ -105,7 +109,7 @@ class ChatViewModel @Inject constructor(
         val chatId = _currentChat.value?.id ?: return
         viewModelScope.launch {
             try {
-                val updatedChat = chatUseCase.getChatById(chatId)
+                val updatedChat = chatManagementUseCase.getChatById(chatId)
                 if (updatedChat != null) {
                     _currentChat.value = updatedChat
                 }
@@ -124,7 +128,7 @@ class ChatViewModel @Inject constructor(
         
         viewModelScope.launch {
             try {
-                val updatedChat = chatUseCase.getChatById(chatId)
+                val updatedChat = chatManagementUseCase.getChatById(chatId)
                 if (updatedChat != null) {
                     Log.d("ChatViewModel", "Updated chat: ${updatedChat.nativeLanguage.displayName} ↔ ${updatedChat.translateLanguage.displayName}")
                     
@@ -155,7 +159,7 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val chatId = _currentChat.value?.id ?: return@launch
-                chatUseCase.clearChatMessages(chatId)
+                chatManagementUseCase.clearChatMessages(chatId)
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(errorMessage = "채팅 기록 삭제에 실패했어요")
             }

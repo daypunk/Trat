@@ -34,11 +34,7 @@ fun MessageBubble(
                 .align(if (message.isUserMessage) Alignment.CenterEnd else Alignment.CenterStart)
                 .widthIn(min = 60.dp, max = 280.dp)
                 .background(
-                    color = when {
-                        isHighlighted && !message.isUserMessage -> TossGray200
-                        message.isUserMessage -> TossInputMessage
-                        else -> TossOutputMessage
-                    },
+                    color = if (message.isUserMessage) TossInputMessage else TossOutputMessage,
                     shape = RoundedCornerShape(
                         topStart = 18.dp,
                         topEnd = 18.dp,

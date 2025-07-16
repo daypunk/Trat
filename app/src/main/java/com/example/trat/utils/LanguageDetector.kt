@@ -43,25 +43,25 @@ object LanguageDetector {
     
     private fun containsKorean(text: String): Boolean {
         return text.any { char ->
-            char in '\uAC00'..'\uD7AF' || // 한글 음절
-            char in '\u1100'..'\u11FF' || // 한글 자모
-            char in '\u3130'..'\u318F'    // 한글 호환 자모
+            char in Constants.UnicodeRanges.KOREAN_START..Constants.UnicodeRanges.KOREAN_END || // 한글 음절
+            char in Constants.UnicodeRanges.KOREAN_JAMO_START..Constants.UnicodeRanges.KOREAN_JAMO_END || // 한글 자모
+            char in Constants.UnicodeRanges.KOREAN_COMPAT_START..Constants.UnicodeRanges.KOREAN_COMPAT_END    // 한글 호환 자모
         }
     }
     
     private fun containsChinese(text: String): Boolean {
         return text.any { char ->
-            char in '\u4E00'..'\u9FFF' || // CJK 통합 한자
-            char in '\u3400'..'\u4DBF' || // CJK 확장 A
-            char in '\uF900'..'\uFAFF'    // CJK 호환 한자
+            char in Constants.UnicodeRanges.CJK_START..Constants.UnicodeRanges.CJK_END || // CJK 통합 한자
+            char in Constants.UnicodeRanges.CJK_EXT_A_START..Constants.UnicodeRanges.CJK_EXT_A_END || // CJK 확장 A
+            char in Constants.UnicodeRanges.CJK_COMPAT_START..Constants.UnicodeRanges.CJK_COMPAT_END    // CJK 호환 한자
         }
     }
     
     private fun containsJapanese(text: String): Boolean {
         return text.any { char ->
-            char in '\u3040'..'\u309F' || // 히라가나
-            char in '\u30A0'..'\u30FF' || // 카타카나
-            char in '\uFF66'..'\uFF9F'    // 반각 카타카나
+            char in Constants.UnicodeRanges.HIRAGANA_START..Constants.UnicodeRanges.HIRAGANA_END || // 히라가나
+            char in Constants.UnicodeRanges.KATAKANA_START..Constants.UnicodeRanges.KATAKANA_END || // 카타카나
+            char in '\uFF66'..'\uFF9F'    // 반각 카타카나 (추가 범위)
         }
     }
 } 

@@ -2,6 +2,7 @@ package com.example.trat.domain.usecase
 
 import android.util.Log
 import com.example.trat.domain.service.LanguageDetectionService
+import com.example.trat.utils.Constants
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -25,7 +26,7 @@ class MessageTranslationUseCase @Inject constructor(
     suspend fun sendMessage(chatId: String, inputText: String): String {
         // 1. 채팅방 정보 조회
         val chat = chatManagementUseCase.getChatById(chatId) 
-            ?: throw Exception("채팅방을 찾을 수 없습니다")
+            ?: throw Exception(Constants.Errors.CHAT_NOT_FOUND)
         
         // 2. 언어 자동 감지 및 채팅 설정 업데이트
         val updatedChat = updateChatLanguageIfNeeded(chatId, inputText, chat)

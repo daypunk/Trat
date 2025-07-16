@@ -367,7 +367,7 @@ fun ChatScreen(
                             translateLanguage = translateLanguage
                         ) {
                             // 데이터베이스 업데이트 완료 후 ChatViewModel 새로고침
-                            viewModel.refreshCurrentChatAndCheckModels()
+                            viewModel.refreshCurrentChat()
                         }
                     }
                 }
@@ -438,7 +438,7 @@ private fun EmptyChatState(
                     LottieAnimation(
                         composition = composition,
                         progress = { progress },
-                        modifier = Modifier.size(80.dp),
+                        modifier = Modifier.size(120.dp),
                     )
                     Text(
                         text = "메시지를 입력하세요",

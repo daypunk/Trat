@@ -6,10 +6,10 @@
     
     <!-- 원본 로고를 중앙에 배치하고 크기 조정 -->
     <group
-        android:translateX="16"
-        android:translateY="45"
-        android:scaleX="0.2"
-        android:scaleY="0.2">
+        android:translateX="27"
+        android:translateY="46"
+        android:scaleX="0.15"
+        android:scaleY="0.15">
         
         <!-- 첫 번째 폴리곤 (하늘색) -->
         <path
@@ -38,5 +38,4 @@
             android:fillColor="#00FFDA"
             android:pathData="M98.24,0.61 L98.24,75.4 L88.4,66.56 L46.62,75.4 L22.28,39.79 Z"/>
     </group>
-        
 </vector> 

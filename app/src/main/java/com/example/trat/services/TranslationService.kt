@@ -29,7 +29,7 @@ class TranslationService @Inject constructor(
         targetLanguage: SupportedLanguage
     ): Result<String> {
         if (text.isBlank()) {
-            return Result.failure(Exception("번역할 텍스트가 비어있습니다"))
+            return Result.failure(Exception(Constants.Errors.EMPTY_TEXT))
         }
         
         if (sourceLanguage == targetLanguage) {
@@ -51,7 +51,7 @@ class TranslationService @Inject constructor(
                 if (!targetModelExists) missingModels.add(targetLanguage.displayName)
                 
                 Log.w("TranslationService", "Missing models: $missingModels")
-                return Result.failure(Exception(Constants.ERROR_MODEL_DOWNLOAD_FAILED))
+                return Result.failure(Exception(Constants.Errors.MODEL_DOWNLOAD_FAILED))
             }
             
             val translator = getOrCreateTranslator(sourceLanguage, targetLanguage)
@@ -59,7 +59,7 @@ class TranslationService @Inject constructor(
             // 모델 다운로드 확인 (이중 체크)
             val isModelReady = ensureModelDownloaded(translator)
             if (!isModelReady) {
-                return Result.failure(Exception(Constants.ERROR_MODEL_DOWNLOAD_FAILED))
+                return Result.failure(Exception(Constants.Errors.MODEL_DOWNLOAD_FAILED))
             }
             
             // 번역 수행
@@ -94,7 +94,7 @@ class TranslationService @Inject constructor(
             // 모델 강제 재다운로드
             val isModelReinstalled = forceModelRedownload(sourceLanguage, targetLanguage)
             if (!isModelReinstalled) {
-                return Result.failure(Exception(Constants.ERROR_MODEL_REINSTALL_FAILED))
+                return Result.failure(Exception(Constants.Errors.MODEL_REINSTALL_FAILED))
             }
             
             // 새 Translator 생성 및 번역 재시도
@@ -102,7 +102,7 @@ class TranslationService @Inject constructor(
             val isModelReady = ensureModelDownloaded(newTranslator)
             
             if (!isModelReady) {
-                return Result.failure(Exception(Constants.ERROR_MODEL_REINSTALL_FAILED))
+                return Result.failure(Exception(Constants.Errors.MODEL_REINSTALL_FAILED))
             }
             
             // 번역 재시도
@@ -111,7 +111,7 @@ class TranslationService @Inject constructor(
             
         } catch (e: Exception) {
             // 재시도도 실패하면 사용자 친화적인 메시지 반환
-            Result.failure(Exception(Constants.ERROR_MODEL_REINSTALL_FAILED))
+            Result.failure(Exception(Constants.Errors.MODEL_REINSTALL_FAILED))
         }
     }
     
@@ -130,7 +130,7 @@ class TranslationService @Inject constructor(
             if (isDownloaded) {
                 Result.success(true)
             } else {
-                Result.failure(Exception(Constants.ERROR_MODEL_DOWNLOAD_FAILED))
+                Result.failure(Exception(Constants.Errors.MODEL_DOWNLOAD_FAILED))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -215,7 +215,7 @@ class TranslationService @Inject constructor(
                         continuation.resumeWithException(exception)
                     }
             }
-        } ?: throw Exception(Constants.ERROR_TRANSLATION_FAILED)
+        } ?: throw Exception(Constants.Errors.TRANSLATION_FAILED)
     }
     
     /**

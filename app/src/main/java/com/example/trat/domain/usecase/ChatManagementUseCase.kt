@@ -3,6 +3,7 @@ package com.example.trat.domain.usecase
 import com.example.trat.data.entities.Chat
 import com.example.trat.data.models.SupportedLanguage
 import com.example.trat.domain.repository.ChatRepositoryInterface
+import com.example.trat.utils.Constants
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -26,7 +27,7 @@ class ChatManagementUseCase @Inject constructor(
         translateLanguage: SupportedLanguage
     ): Chat {
         val chat = Chat(
-            title = title.ifBlank { "이름없는 번역챗" },
+            title = title.ifBlank { Constants.Defaults.CHAT_TITLE },
             nativeLanguage = nativeLanguage,
             translateLanguage = translateLanguage
         )

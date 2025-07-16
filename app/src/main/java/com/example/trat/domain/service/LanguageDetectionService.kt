@@ -1,6 +1,7 @@
 package com.example.trat.domain.service
 
 import com.example.trat.data.models.SupportedLanguage
+import com.example.trat.utils.Constants
 import com.example.trat.utils.LanguageDetector
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -25,7 +26,7 @@ class LanguageDetectionService @Inject constructor() {
      * 텍스트가 언어 감지에 충분한 길이인지 확인
      */
     fun isTextSufficientForDetection(text: String): Boolean {
-        return text.trim().length >= 2
+        return text.trim().length >= Constants.Translation.MIN_TEXT_LENGTH_FOR_DETECTION
     }
     
     /**
@@ -35,10 +36,10 @@ class LanguageDetectionService @Inject constructor() {
         val characteristics = analyzeCharacteristics(text)
         
         return when {
-            characteristics.koreanRatio > 0.3 -> SupportedLanguage.KOREAN
-            characteristics.japaneseRatio > 0.3 -> SupportedLanguage.JAPANESE
-            characteristics.chineseRatio > 0.3 -> SupportedLanguage.CHINESE
-            characteristics.englishRatio > 0.3 -> SupportedLanguage.ENGLISH
+            characteristics.koreanRatio > Constants.Translation.LANGUAGE_RATIO_THRESHOLD -> SupportedLanguage.KOREAN
+            characteristics.japaneseRatio > Constants.Translation.LANGUAGE_RATIO_THRESHOLD -> SupportedLanguage.JAPANESE
+            characteristics.chineseRatio > Constants.Translation.LANGUAGE_RATIO_THRESHOLD -> SupportedLanguage.CHINESE
+            characteristics.englishRatio > Constants.Translation.LANGUAGE_RATIO_THRESHOLD -> SupportedLanguage.ENGLISH
             else -> detectLanguage(text) // 기본 감지로 폴백
         }
     }

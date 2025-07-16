@@ -9,7 +9,25 @@ import kotlinx.coroutines.launch
 
 /**
  * 모든 ViewModel의 기본 클래스
- * 공통 UI 상태 관리와 에러 처리 로직을 제공
+ * 
+ * ## 제공 기능
+ * - 공통 UI 상태 관리 (로딩, 에러)
+ * - 표준화된 에러 처리 패턴
+ * - 코루틴 기반 안전한 비동기 작업 실행
+ * - 자동 로딩 상태 관리
+ * 
+ * ## 사용법
+ * ```kotlin
+ * class MyViewModel : BaseViewModel<MyUiState>() {
+ *     fun doSomething() {
+ *         launchSafely { 
+ *             // 비즈니스 로직
+ *         }
+ *     }
+ * }
+ * ```
+ * 
+ * @param T UI 상태 타입 (BaseUiState를 구현해야 함)
  */
 abstract class BaseViewModel<T : BaseUiState> : ViewModel() {
     

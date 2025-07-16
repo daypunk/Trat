@@ -9,10 +9,12 @@ import com.example.trat.domain.usecase.ChatManagementUseCase
 import com.example.trat.domain.usecase.MessageUseCase
 import com.example.trat.domain.usecase.MessageTranslationUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     private val chatManagementUseCase: ChatManagementUseCase,
@@ -28,12 +30,23 @@ class ChatViewModel @Inject constructor(
     private val _currentChat = MutableStateFlow<Chat?>(null)
     val currentChat: StateFlow<Chat?> = _currentChat.asStateFlow()
     
-    // 메시지 목록
-    private val _messages = MutableStateFlow<List<Message>>(emptyList())
-    val messages: StateFlow<List<Message>> = _messages.asStateFlow()
+    // 현재 채팅 ID
+    private val _currentChatId = MutableStateFlow<String?>(null)
+    
+    // 메시지 목록 (자동 업데이트)
+    val messages: StateFlow<List<Message>> = _currentChatId
+        .filterNotNull()
+        .flatMapLatest { chatId ->
+            messageUseCase.getMessagesForChat(chatId)
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
     
     /**
-     * 채팅방 초기화
+     * 채팅방 초기화 (최적화된 버전)
      */
     fun initializeChat(chatId: String) {
         launchSimple(
@@ -42,14 +55,10 @@ class ChatViewModel @Inject constructor(
             val chat = chatManagementUseCase.getChatById(chatId)
             if (chat != null) {
                 _currentChat.value = chat
+                _currentChatId.value = chatId // 메시지 Flow 자동 트리거
                 
                 // 앱 시작 시 모든 모델이 다운로드되므로 항상 준비된 상태로 설정
                 updateUiState { copy(isModelReady = true) }
-                
-                // 메시지 로드
-                messageUseCase.getMessagesForChat(chatId).collect { messageList ->
-                    _messages.value = messageList
-                }
             } else {
                 setError("채팅방을 찾을 수 없어요")
             }
@@ -84,28 +93,11 @@ class ChatViewModel @Inject constructor(
     }
     
     /**
-     * 현재 채팅 정보 새로고침 (언어 설정 변경 후 사용)
+     * 현재 채팅 정보 새로고침 (통합 버전)
      */
     fun refreshCurrentChat() {
         val chatId = _currentChat.value?.id ?: return
-        viewModelScope.launch {
-            try {
-                val updatedChat = chatManagementUseCase.getChatById(chatId)
-                if (updatedChat != null) {
-                    _currentChat.value = updatedChat
-                }
-            } catch (e: Exception) {
-                // 에러 처리 (로그만 남기고 무시)
-            }
-        }
-    }
-    
-    /**
-     * 현재 채팅 정보 새로고침
-     */
-    fun refreshCurrentChatAndCheckModels() {
-        val chatId = _currentChat.value?.id ?: return
-        Log.d("ChatViewModel", "refreshCurrentChatAndCheckModels called for chatId: $chatId")
+        Log.d("ChatViewModel", "refreshCurrentChat called for chatId: $chatId")
         
         launchSimple(
             onError = { setError("설정 업데이트 중 오류가 발생했어요") }
@@ -114,7 +106,7 @@ class ChatViewModel @Inject constructor(
             if (updatedChat != null) {
                 Log.d("ChatViewModel", "Updated chat: ${updatedChat.nativeLanguage.displayName} ↔ ${updatedChat.translateLanguage.displayName}")
                 
-                // 즉시 currentChat 업데이트 (뱃지가 바로 변경되도록)
+                // 채팅 정보 업데이트
                 _currentChat.value = updatedChat
                 
                 // 앱 시작 시 모든 모델이 다운로드되므로 항상 준비된 상태

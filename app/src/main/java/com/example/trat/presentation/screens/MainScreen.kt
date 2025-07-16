@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import com.example.trat.data.models.SupportedLanguage
 import com.example.trat.presentation.components.LanguageSettingsDialog
 import com.example.trat.presentation.components.InitialModelDownloadDialog
+import com.example.trat.utils.Constants
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -37,7 +38,7 @@ fun MainScreen(
     
     // 앱 시작 시 모델 확인 및 다운로드 다이얼로그 표시
     LaunchedEffect(Unit) {
-        delay(500) // 스플래시 화면 이후 약간의 딜레이
+        delay(Constants.App.SPLASH_DELAY_MS) // 스플래시 화면 이후 약간의 딜레이
         
         val allModelsDownloaded = viewModel.areAllModelsDownloaded()
         modelsChecked = true

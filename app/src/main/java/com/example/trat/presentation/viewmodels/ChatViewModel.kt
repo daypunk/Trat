@@ -8,6 +8,7 @@ import com.example.trat.data.entities.Message
 import com.example.trat.domain.usecase.ChatManagementUseCase
 import com.example.trat.domain.usecase.MessageUseCase
 import com.example.trat.domain.usecase.MessageTranslationUseCase
+import com.example.trat.domain.usecase.SpeechToTextUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
@@ -19,7 +20,8 @@ import javax.inject.Inject
 class ChatViewModel @Inject constructor(
     private val chatManagementUseCase: ChatManagementUseCase,
     private val messageUseCase: MessageUseCase,
-    private val messageTranslationUseCase: MessageTranslationUseCase
+    private val messageTranslationUseCase: MessageTranslationUseCase,
+    private val speechToTextUseCase: SpeechToTextUseCase
 ) : BaseViewModel<ChatUiState>() {
     
     // UI 상태
@@ -44,6 +46,11 @@ class ChatViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
+    
+    // STT 상태 (UseCase에서 직접 노출)
+    val isListening: StateFlow<Boolean> = speechToTextUseCase.isListening
+    val recognizedText: StateFlow<String> = speechToTextUseCase.recognizedText
+    val sttError: StateFlow<String?> = speechToTextUseCase.error
     
     /**
      * 채팅방 초기화 (최적화된 버전)
@@ -90,6 +97,50 @@ class ChatViewModel @Inject constructor(
      */
     fun updateInputText(text: String) {
         updateUiState { copy(inputText = text) }
+    }
+    
+    /**
+     * 음성 인식 시작
+     */
+    fun startSpeechToText() {
+        val language = _currentChat.value?.nativeLanguage ?: return
+        launchSimple(
+            onError = { setError("음성 인식 시작 중 오류가 발생했어요") }
+        ) {
+            speechToTextUseCase.startListening(language)
+        }
+    }
+    
+    /**
+     * 음성 인식 중지
+     */
+    fun stopSpeechToText() {
+        launchSimple(
+            onError = { setError("음성 인식 중지 중 오류가 발생했어요") }
+        ) {
+            speechToTextUseCase.stopListening()
+        }
+    }
+    
+    /**
+     * 인식된 텍스트를 입력 필드에 추가
+     */
+    fun appendRecognizedText(recognizedText: String) {
+        val currentText = _uiState.value.inputText
+        val newText = if (currentText.isEmpty()) {
+            recognizedText
+        } else {
+            "$currentText $recognizedText"
+        }
+        updateInputText(newText)
+        speechToTextUseCase.clearRecognizedText()
+    }
+    
+    /**
+     * STT 에러 클리어
+     */
+    fun clearSttError() {
+        speechToTextUseCase.clearError()
     }
     
     /**

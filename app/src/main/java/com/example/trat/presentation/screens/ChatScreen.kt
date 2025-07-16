@@ -19,6 +19,8 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -39,6 +41,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.ui.res.painterResource
 import com.example.trat.R
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import com.example.trat.ui.theme.TossGray300
 import com.example.trat.ui.theme.TossInputMessage
@@ -46,6 +49,15 @@ import androidx.compose.foundation.shape.CircleShape
 import com.example.trat.data.models.SupportedLanguage
 import com.example.trat.presentation.components.LanguageSettingsDialog
 import com.airbnb.lottie.compose.*
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.compose.runtime.DisposableEffect
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -60,6 +72,11 @@ fun ChatScreen(
     val currentChat by viewModel.currentChat.collectAsStateWithLifecycle()
     val messages by viewModel.messages.collectAsStateWithLifecycle()
     val chats by mainViewModel.chats.collectAsStateWithLifecycle()
+    
+    // STT 상태
+    val isListening by viewModel.isListening.collectAsStateWithLifecycle()
+    val recognizedText by viewModel.recognizedText.collectAsStateWithLifecycle()
+    val sttError by viewModel.sttError.collectAsStateWithLifecycle()
     
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -108,6 +125,21 @@ fun ChatScreen(
         uiState.errorMessage?.let { message ->
             Toast.makeText(context, message, Toast.LENGTH_LONG).show()
             viewModel.clearError() // 토스트 표시 후 에러 메시지 클리어
+        }
+    }
+    
+    // STT 에러 메시지 토스트 표시
+    LaunchedEffect(sttError) {
+        sttError?.let { error ->
+            Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
+            viewModel.clearSttError()
+        }
+    }
+    
+    // 음성 인식 결과 처리
+    LaunchedEffect(recognizedText) {
+        if (recognizedText.isNotEmpty()) {
+            viewModel.appendRecognizedText(recognizedText)
         }
     }
     
@@ -219,7 +251,9 @@ fun ChatScreen(
                                     text = currentChat?.title ?: "채팅",
                                     style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp),
                                     fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
                                 )
                         }
                     },
@@ -241,7 +275,10 @@ fun ChatScreen(
                 onInputChange = viewModel::updateInputText,
                 onSendMessage = { viewModel.sendMessage(uiState.inputText) },
                 isTranslating = uiState.isTranslating,
-                isModelReady = uiState.isModelReady
+                isModelReady = uiState.isModelReady,
+                isListening = isListening,
+                onStartSpeechToText = viewModel::startSpeechToText,
+                onStopSpeechToText = viewModel::stopSpeechToText
             )
         }
     ) { paddingValues ->
@@ -458,21 +495,49 @@ private fun ChatInputBar(
     onInputChange: (String) -> Unit,
     onSendMessage: () -> Unit,
     isTranslating: Boolean,
-    isModelReady: Boolean
+    isModelReady: Boolean,
+    isListening: Boolean,
+    onStartSpeechToText: () -> Unit,
+    onStopSpeechToText: () -> Unit
 ) {
+    val context = LocalContext.current
+    
+    // 마이크 클릭 시 즉시 피드백을 위한 로컬 상태
+    var showPopoverImmediately by remember { mutableStateOf(false) }
+    
+    // 권한 요청 런처
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            onStartSpeechToText()
+        } else {
+            showPopoverImmediately = false // 권한 거부 시 팝오버 숨김
+            Toast.makeText(context, "음성 인식을 위해 마이크 권한이 필요합니다", Toast.LENGTH_SHORT).show()
+        }
+    }
+    
+    // isListening 상태 변화 감지하여 로컬 상태 동기화
+    LaunchedEffect(isListening) {
+        if (!isListening) {
+            showPopoverImmediately = false
+        }
+    }
     Surface(
         color = MaterialTheme.colorScheme.surface,
         shadowElevation = 8.dp,
-        modifier = Modifier.shadow(
-            elevation = 8.dp,
-            spotColor = Color.Black.copy(alpha = 0.3f),
-            ambientColor = Color.Black.copy(alpha = 0.15f)
-        )
+        modifier = Modifier
+            .shadow(
+                elevation = 8.dp,
+                spotColor = Color.Black.copy(alpha = 0.3f),
+                ambientColor = Color.Black.copy(alpha = 0.15f)
+            )
+            .windowInsetsPadding(WindowInsets.navigationBars)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 32.dp),
+                .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -489,7 +554,70 @@ private fun ChatInputBar(
                     focusedBorderColor = TossInputMessage,
                     unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                     focusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                )
+                ),
+                trailingIcon = {
+                    Box(
+                        contentAlignment = Alignment.Center
+                    ) {
+                        IconButton(
+                            onClick = {
+                                if (isListening) {
+                                    onStopSpeechToText()
+                                } else {
+                                    // 권한 확인 후 음성 인식 시작
+                                    when (ContextCompat.checkSelfPermission(
+                                        context,
+                                        Manifest.permission.RECORD_AUDIO
+                                    )) {
+                                        PackageManager.PERMISSION_GRANTED -> {
+                                            showPopoverImmediately = true // 즉시 팝오버 표시
+                                            onStartSpeechToText()
+                                        }
+                                        else -> {
+                                            showPopoverImmediately = true // 권한 요청 중에도 팝오버 표시
+                                            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                        }
+                                    }
+                                }
+                            },
+                            enabled = !isTranslating && isModelReady,
+                            modifier = Modifier.size(48.dp) // 고정 크기로 위치 일관성 보장
+                        ) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.size(20.dp) // 아이콘 영역 고정
+                            ) {
+                                Icon(
+                                    painter = painterResource(
+                                        id = if (isListening) R.drawable.ic_mic_off else R.drawable.ic_mic
+                                    ),
+                                    contentDescription = if (isListening) "음성 인식 중지" else "음성 인식 시작",
+                                    tint = if (isListening) {
+                                        MaterialTheme.colorScheme.error
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                                    },
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        
+                        // 음성 인식 중 popover - 클릭 즉시 또는 인식 중에 표시
+                        androidx.compose.animation.AnimatedVisibility(
+                            visible = isListening || showPopoverImmediately,
+                            enter = slideInVertically(
+                                initialOffsetY = { it },
+                                animationSpec = tween(300)
+                            ) + fadeIn(animationSpec = tween(300)),
+                            exit = slideOutVertically(
+                                targetOffsetY = { it },
+                                animationSpec = tween(300)
+                            ) + fadeOut(animationSpec = tween(300))
+                        ) {
+                            SpeechRecognitionPopover()
+                        }
+                    }
+                }
             )
             
             val isEnabled = inputText.isNotBlank() && isModelReady && !isTranslating
@@ -497,7 +625,13 @@ private fun ChatInputBar(
                 onClick = { if (isEnabled) onSendMessage() },
                 modifier = Modifier.size(48.dp),
                 containerColor = if (isEnabled) TossInputMessage else TossGray300,
-                contentColor = Color.White
+                contentColor = Color.White,
+                elevation = FloatingActionButtonDefaults.elevation(
+                    defaultElevation = 0.dp,
+                    pressedElevation = 0.dp,
+                    focusedElevation = 0.dp,
+                    hoveredElevation = 0.dp
+                )
             ) {
                 if (isTranslating) {
                     CircularProgressIndicator(
@@ -513,6 +647,40 @@ private fun ChatInputBar(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SpeechRecognitionPopover() {
+    // 로딩 애니메이션 설정
+    val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.loading_lottie))
+    val progress by animateLottieCompositionAsState(
+        composition = composition,
+        iterations = LottieConstants.IterateForever
+    )
+    
+    Card(
+        modifier = Modifier
+            .offset(y = (-76).dp, x = (-12).dp) // 마이크 아이콘 중앙에 맞춤
+            .size(72.dp, 40.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFF4CAF50).copy(alpha = 0.12f) // 옅은 그린
+        ),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(8.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            LottieAnimation(
+                composition = composition,
+                progress = { progress },
+                modifier = Modifier.size(24.dp)
+            )
         }
     }
 }
@@ -735,7 +903,8 @@ private fun ChatItemInMenu(
                     style = MaterialTheme.typography.titleSmall.copy(fontSize = 16.sp),
                     fontWeight = if (isCurrentChat) FontWeight.SemiBold else FontWeight.Normal,
                     color = if (isCurrentChat) TossInputMessage else MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 
                 // 언어 정보 표시 (Refresh 아이콘 포함)

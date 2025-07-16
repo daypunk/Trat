@@ -911,10 +911,11 @@ private fun ChatItemInMenu(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(68.dp)
+                .height(76.dp) 
                 .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // 언어뱃지(위) + 타이틀(아래) Column 구조
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -925,8 +926,30 @@ private fun ChatItemInMenu(
                             Modifier
                         }
                     ),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
+                // 언어 뱃지 (위쪽 배치)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = getLanguageFlag(chat.nativeLanguage.code),
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp)
+                    )
+                    Icon(
+                        imageVector = Icons.Rounded.Refresh,
+                        contentDescription = "양방향 번역",
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Text(
+                        text = getLanguageFlag(chat.translateLanguage.code),
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp)
+                    )
+                }
+                
+                // 타이틀 (아래쪽 배치)
                 Text(
                     text = chat.title,
                     style = MaterialTheme.typography.titleSmall.copy(fontSize = 16.sp),
@@ -935,25 +958,22 @@ private fun ChatItemInMenu(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                
-                // 언어 정보 표시 (Refresh 아이콘 포함)
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+            }
+            
+            // 현재 채팅 표시 점 (휴지통과 같은 위치에 배치)
+            if (isCurrentChat && !isEditMode) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp), // 휴지통 버튼과 같은 크기 영역
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = getLanguageFlag(chat.nativeLanguage.code),
-                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp)
-                    )
-                    Icon(
-                        imageVector = Icons.Rounded.Refresh,
-                        contentDescription = "양방향 번역",
-                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                        modifier = Modifier.size(10.dp)
-                    )
-                    Text(
-                        text = getLanguageFlag(chat.translateLanguage.code),
-                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp)
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .background(
+                                color = TossInputMessage,
+                                shape = CircleShape
+                            )
                     )
                 }
             }
@@ -970,15 +990,6 @@ private fun ChatItemInMenu(
                         modifier = Modifier.size(18.dp)
                     )
                 }
-            } else if (isCurrentChat) {
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .background(
-                            color = TossInputMessage,
-                            shape = CircleShape
-                        )
-                )
             }
         }
     }

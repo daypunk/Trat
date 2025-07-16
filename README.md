@@ -159,6 +159,9 @@ di/
 
 ## STT (Speech-to-Text)
 
+STT는 온라인에서만 가능합니다.
+모델이 너무 크기에...
+
 ### 아키텍처 구현
 ```kotlin
 // Clean Architecture 적용

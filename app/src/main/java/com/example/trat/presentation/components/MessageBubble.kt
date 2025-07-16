@@ -16,6 +16,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.trat.data.entities.Message
 import com.example.trat.ui.theme.*
+import java.text.SimpleDateFormat
+import java.util.*
 
 @Composable
 fun MessageBubble(
@@ -23,15 +25,15 @@ fun MessageBubble(
     isHighlighted: Boolean = false,
     searchQuery: String = ""
 ) {
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        horizontalAlignment = if (message.isUserMessage) Alignment.End else Alignment.Start
     ) {
         // 메시지 버블
         Box(
             modifier = Modifier
-                .align(if (message.isUserMessage) Alignment.CenterEnd else Alignment.CenterStart)
                 .widthIn(min = 60.dp, max = 280.dp)
                 .background(
                     color = if (message.isUserMessage) TossInputMessage else TossOutputMessage,
@@ -76,6 +78,41 @@ fun MessageBubble(
                     fontWeight = FontWeight.Normal
                 )
             }
+        }
+        
+        // 타임스탬프
+        Text(
+            text = formatTimestamp(message.timestamp),
+            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+            modifier = Modifier.padding(
+                start = if (message.isUserMessage) 0.dp else 12.dp,
+                end = if (message.isUserMessage) 12.dp else 0.dp,
+                top = 4.dp
+            )
+        )
+    }
+}
+
+// 타임스탬프 포맷팅 함수
+private fun formatTimestamp(timestamp: Long): String {
+    val now = System.currentTimeMillis()
+    val diff = now - timestamp
+    
+    return when {
+        diff < 60 * 1000 -> "방금 전" // 1분 미만
+        diff < 60 * 60 * 1000 -> "${diff / (60 * 1000)}분 전" // 1시간 미만
+        diff < 24 * 60 * 60 * 1000 -> { // 24시간 미만
+            val formatter = SimpleDateFormat("HH:mm", Locale.getDefault())
+            formatter.format(Date(timestamp))
+        }
+        diff < 7 * 24 * 60 * 60 * 1000 -> { // 7일 미만
+            val formatter = SimpleDateFormat("MM/dd HH:mm", Locale.getDefault())
+            formatter.format(Date(timestamp))
+        }
+        else -> { // 7일 이상
+            val formatter = SimpleDateFormat("yy/MM/dd", Locale.getDefault())
+            formatter.format(Date(timestamp))
         }
     }
 }

@@ -7,6 +7,7 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import com.example.trat.domain.repository.SpeechToTextRepositoryInterface
+import com.example.trat.utils.NetworkUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -53,8 +54,15 @@ class SpeechToTextRepository @Inject constructor(
         }
         
         if (!SpeechRecognizer.isRecognitionAvailable(context)) {
-            android.util.Log.e("STT_DEBUG", "❌ 음성 인식 사용 불가")
-            _error.value = "음성 인식을 사용할 수 없습니다"
+            android.util.Log.e("STT_DEBUG", "❌ 음성 인식 사용 불가 (에뮬레이터에서는 지원되지 않음)")
+            _error.value = "음성 인식을 사용할 수 없습니다 (실제 기기에서 테스트해주세요)"
+            return@withLock
+        }
+        
+        // 🌐 네트워크 연결 상태 확인 (Google STT는 온라인 서비스)
+        if (!NetworkUtils.isNetworkAvailable(context)) {
+            android.util.Log.e("STT_DEBUG", "❌ 오프라인 상태 - 음성 인식 불가")
+            _error.value = "오프라인에서는 음성인식을 할 수 없습니다"
             return@withLock
         }
         
@@ -123,24 +131,24 @@ class SpeechToTextRepository @Inject constructor(
         _error.value = null
     }
     
-    // 6초 무입력 타임아웃
+    // 4초 무입력 타임아웃
     private fun startNoInputTimeout() {
         timeoutJob?.cancel()
-        android.util.Log.d("STT_DEBUG", "⏰ 6초 무입력 타임아웃 시작 (음성 없으면 자동 종료)")
+        android.util.Log.d("STT_DEBUG", "⏰ 4초 무입력 타임아웃 시작 (음성 없으면 자동 종료)")
         timeoutJob = repositoryScope.launch {
-            kotlinx.coroutines.delay(6000) // 6초
-            android.util.Log.d("STT_DEBUG", "⏰ 6초 무입력 타임아웃 발생 - 자동 종료")
+            kotlinx.coroutines.delay(4000) // 4초로 단축
+            android.util.Log.d("STT_DEBUG", "⏰ 4초 무입력 타임아웃 발생 - 자동 종료")
             stopListening()
         }
     }
     
-    // 2초 침묵 타임아웃 (음성 입력 후)
+    // 1초 침묵 타임아웃 (음성 입력 후, 기존 2초에서 단축)
     private fun startSilenceTimeout() {
         silenceTimeoutJob?.cancel()
-        android.util.Log.d("STT_DEBUG", "🤫 2초 침묵 타임아웃 시작 (말 끝나면 2초 후 자동 종료)")
+        android.util.Log.d("STT_DEBUG", "🤫 1초 침묵 타임아웃 시작 (말 끝나면 1초 후 자동 종료)")
         silenceTimeoutJob = repositoryScope.launch {
-            kotlinx.coroutines.delay(2000) // 2초
-            android.util.Log.d("STT_DEBUG", "🤫 2초 침묵 타임아웃 발생 - 자동 종료")
+            kotlinx.coroutines.delay(1000) // 1초로 단축
+            android.util.Log.d("STT_DEBUG", "🤫 1초 침묵 타임아웃 발생 - 자동 종료")
             stopListening()
         }
     }

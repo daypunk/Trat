@@ -12,6 +12,8 @@ import com.example.trat.presentation.viewmodels.MainViewModel
 import androidx.compose.ui.unit.dp
 import com.example.trat.data.models.SupportedLanguage
 import com.example.trat.presentation.components.LanguageSettingsDialog
+import com.example.trat.presentation.components.InitialModelDownloadDialog
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -20,21 +22,41 @@ fun MainScreen(
     viewModel: MainViewModel = hiltViewModel()
 ) {
     val chats by viewModel.chats.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     
     // 로딩 상태 관리
     var isInitialized by remember { mutableStateOf(false) }
     var hasNavigated by remember { mutableStateOf(false) }
     var showNewChatDialog by remember { mutableStateOf(false) }
+    var modelsChecked by remember { mutableStateOf(false) }
     
     // 저장된 마지막 채팅 ID 가져오기
     val sharedPrefs = context.getSharedPreferences("trat_prefs", android.content.Context.MODE_PRIVATE)
     val lastChatId = sharedPrefs.getString("last_chat_id", null)
     
-    // 채팅 목록 로딩 완료 후 네비게이션
-    LaunchedEffect(chats) {
+    // 앱 시작 시 모델 확인 및 다운로드 다이얼로그 표시
+    LaunchedEffect(Unit) {
+        delay(500) // 스플래시 화면 이후 약간의 딜레이
+        
+        val allModelsDownloaded = viewModel.areAllModelsDownloaded()
+        modelsChecked = true
+        
+        if (!allModelsDownloaded && !uiState.modelsDownloaded) {
+            viewModel.setShowModelDownloadDialog(true)
+        }
+    }
+    
+
+    
+    // 채팅 목록 로딩 완료 후 네비게이션 (모델 다운로드 완료 후에만)
+    LaunchedEffect(chats, uiState.modelsDownloaded, modelsChecked) {
         // 이미 네비게이션 했으면 중복 실행 방지
         if (hasNavigated) return@LaunchedEffect
+        
+        // 모델이 다운로드 되었거나 이미 모든 모델이 있는 경우에만 네비게이션 실행
+        val shouldNavigate = (uiState.modelsDownloaded || (modelsChecked && !uiState.showModelDownloadDialog))
+        if (!shouldNavigate) return@LaunchedEffect
         
         // 로딩 완료를 기다림 (채팅 데이터가 로드될 때까지)
         if (!isInitialized) {
@@ -64,8 +86,22 @@ fun MainScreen(
         }
     }
     
-    // 새 채팅 생성 다이얼로그가 표시되지 않은 경우에만 로딩 화면 표시
-    if (!showNewChatDialog) {
+    // 모델 다운로드 다이얼로그
+    if (uiState.showModelDownloadDialog) {
+        InitialModelDownloadDialog(
+            downloadProgress = if (uiState.isDownloadingModels) uiState.downloadProgress else null,
+            isDownloading = uiState.isDownloadingModels,
+            onStartDownload = { 
+                viewModel.downloadAllModels(context)
+            },
+            onComplete = {
+                viewModel.setShowModelDownloadDialog(false)
+            }
+        )
+    }
+    
+    // 모델 다운로드 완료 후 로딩 화면 표시 (새 채팅 다이얼로그가 표시되지 않은 경우에만)
+    if (!showNewChatDialog && !uiState.showModelDownloadDialog) {
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
@@ -89,8 +125,10 @@ fun MainScreen(
             currentChat = null,
             isNewChat = true,
             onDismiss = { 
-                // 첫 실행 시에는 다이얼로그를 닫을 수 없도록 함 (채팅이 없는 경우)
-                if (chats.isNotEmpty()) {
+                // 첫 실행 시에는 앱 종료 (채팅이 없는 경우)
+                if (chats.isEmpty()) {
+                    (context as? androidx.activity.ComponentActivity)?.finish()
+                } else {
                     showNewChatDialog = false
                 }
             },

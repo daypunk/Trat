@@ -35,7 +35,7 @@ fun MessageBubble(
                 .widthIn(min = 60.dp, max = 280.dp)
                 .background(
                     color = when {
-                        isHighlighted -> TossGray200
+                        isHighlighted && !message.isUserMessage -> TossGray200
                         message.isUserMessage -> TossInputMessage
                         else -> TossOutputMessage
                     },

@@ -1,10 +1,13 @@
 package com.example.trat.presentation.viewmodels
 
+import android.content.Context
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.trat.data.entities.Chat
 import com.example.trat.data.models.SupportedLanguage
 import com.example.trat.domain.usecase.ChatUseCase
+import com.example.trat.utils.LanguageModelManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -12,7 +15,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
-    private val chatUseCase: ChatUseCase
+    private val chatUseCase: ChatUseCase,
+    private val languageModelManager: LanguageModelManager
 ) : ViewModel() {
     
     // 채팅 목록
@@ -71,11 +75,13 @@ class MainViewModel @Inject constructor(
     fun updateChatLanguages(
         chatId: String,
         nativeLanguage: SupportedLanguage,
-        translateLanguage: SupportedLanguage
+        translateLanguage: SupportedLanguage,
+        onComplete: (() -> Unit)? = null
     ) {
         viewModelScope.launch {
             try {
                 chatUseCase.updateChatLanguages(chatId, nativeLanguage, translateLanguage)
+                onComplete?.invoke()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(errorMessage = "언어 설정 업데이트에 실패했어요")
             }
@@ -89,11 +95,13 @@ class MainViewModel @Inject constructor(
         chatId: String,
         title: String,
         nativeLanguage: SupportedLanguage,
-        translateLanguage: SupportedLanguage
+        translateLanguage: SupportedLanguage,
+        onComplete: (() -> Unit)? = null
     ) {
         viewModelScope.launch {
             try {
                 chatUseCase.updateChatTitleAndLanguages(chatId, title, nativeLanguage, translateLanguage)
+                onComplete?.invoke()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(errorMessage = "설정 업데이트에 실패했어요")
             }
@@ -113,6 +121,92 @@ class MainViewModel @Inject constructor(
     fun getLastChatId(): String? {
         return chats.value.firstOrNull()?.id
     }
+    
+    /**
+     * 모든 언어 모델이 다운로드되어 있는지 확인
+     */
+    suspend fun areAllModelsDownloaded(): Boolean {
+        return try {
+            val allLanguages = SupportedLanguage.values()
+            allLanguages.all { language ->
+                languageModelManager.isModelDownloaded(language)
+            }
+        } catch (e: Exception) {
+            Log.e("MainViewModel", "Error checking models", e)
+            false
+        }
+    }
+    
+    /**
+     * 모든 언어 모델 다운로드
+     */
+    fun downloadAllModels(context: Context) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isDownloadingModels = true,
+                downloadProgress = 0f
+            )
+            
+            try {
+                val allLanguages = SupportedLanguage.values()
+                val totalModels = allLanguages.size
+                
+                Log.d("MainViewModel", "Starting download for all models: ${allLanguages.map { it.displayName }}")
+                
+                allLanguages.forEachIndexed { index, language ->
+                    Log.d("MainViewModel", "Downloading model for ${language.displayName}")
+                    
+                    val result = languageModelManager.downloadModel(language, requireWifi = false)
+                    
+                    if (result.isSuccess) {
+                        Log.d("MainViewModel", "Successfully downloaded ${language.displayName}")
+                    } else {
+                        Log.w("MainViewModel", "Failed to download ${language.displayName}: ${result.exceptionOrNull()?.message}")
+                    }
+                    
+                    // 진행률 업데이트
+                    val progress = (index + 1).toFloat() / totalModels
+                    _uiState.value = _uiState.value.copy(downloadProgress = progress)
+                }
+                
+                Log.d("MainViewModel", "All models download completed")
+                
+                // 다운로드 완료 - 즉시 다이얼로그 닫기
+                _uiState.value = _uiState.value.copy(
+                    isDownloadingModels = false,
+                    modelsDownloaded = true,
+                    downloadProgress = 1f,
+                    showModelDownloadDialog = false
+                )
+                
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "Error downloading models", e)
+                _uiState.value = _uiState.value.copy(
+                    isDownloadingModels = false,
+                    errorMessage = "모델 다운로드에 실패했어요: ${e.message}"
+                )
+            }
+        }
+    }
+    
+    /**
+     * 모델 다운로드 상태 초기화
+     */
+    fun resetModelDownloadState() {
+        _uiState.value = _uiState.value.copy(
+            showModelDownloadDialog = false,
+            isDownloadingModels = false,
+            modelsDownloaded = false,
+            downloadProgress = 0f
+        )
+    }
+    
+    /**
+     * 모델 다운로드 다이얼로그 표시 설정
+     */
+    fun setShowModelDownloadDialog(show: Boolean) {
+        _uiState.value = _uiState.value.copy(showModelDownloadDialog = show)
+    }
 }
 
 /**
@@ -120,5 +214,9 @@ class MainViewModel @Inject constructor(
  */
 data class MainUiState(
     val isLoading: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val showModelDownloadDialog: Boolean = false,
+    val isDownloadingModels: Boolean = false,
+    val modelsDownloaded: Boolean = false,
+    val downloadProgress: Float = 0f
 ) 

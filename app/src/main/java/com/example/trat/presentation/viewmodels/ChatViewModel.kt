@@ -1,5 +1,6 @@
 package com.example.trat.presentation.viewmodels
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.trat.data.entities.Chat
@@ -37,15 +38,8 @@ class ChatViewModel @Inject constructor(
                 if (chat != null) {
                     _currentChat.value = chat
                     
-                    // 먼저 모델 상태를 true로 설정 (대부분의 경우 모델이 이미 있음)
+                    // 앱 시작 시 모든 모델이 다운로드되므로 항상 준비된 상태로 설정
                     _uiState.value = _uiState.value.copy(isModelReady = true)
-                    
-                    // 백그라운드에서 모델 다운로드 시도 (없는 경우에만 다운로드)
-                    try {
-                        chatUseCase.downloadModelsIfNeeded(chatId)
-                    } catch (e: Exception) {
-                        // 모델 다운로드 실패해도 계속 진행 (기존 모델 사용)
-                    }
                     
                     // 메시지 로드
                     chatUseCase.getMessagesForChat(chatId).collect { messageList ->
@@ -74,11 +68,8 @@ class ChatViewModel @Inject constructor(
             try {
                 chatUseCase.sendMessage(chatId, inputText.trim())
                 
-                // 언어가 자동으로 변경되었을 수 있으므로 현재 채팅 정보를 다시 불러옴
-                val updatedChat = chatUseCase.getChatById(chatId)
-                if (updatedChat != null) {
-                    _currentChat.value = updatedChat
-                }
+                // 메시지 전송 후 채팅 정보 새로고침 (언어 감지로 인한 변경사항 반영)
+                refreshCurrentChat()
                 
                 _uiState.value = _uiState.value.copy(
                     isTranslating = false,
@@ -125,6 +116,39 @@ class ChatViewModel @Inject constructor(
     }
     
     /**
+     * 현재 채팅 정보 새로고침
+     */
+    fun refreshCurrentChatAndCheckModels() {
+        val chatId = _currentChat.value?.id ?: return
+        Log.d("ChatViewModel", "refreshCurrentChatAndCheckModels called for chatId: $chatId")
+        
+        viewModelScope.launch {
+            try {
+                val updatedChat = chatUseCase.getChatById(chatId)
+                if (updatedChat != null) {
+                    Log.d("ChatViewModel", "Updated chat: ${updatedChat.nativeLanguage.displayName} ↔ ${updatedChat.translateLanguage.displayName}")
+                    
+                    // 즉시 currentChat 업데이트 (뱃지가 바로 변경되도록)
+                    _currentChat.value = updatedChat
+                    
+                    // 앱 시작 시 모든 모델이 다운로드되므로 항상 준비된 상태
+                    _uiState.value = _uiState.value.copy(
+                        isModelReady = true,
+                        errorMessage = null
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "Error in refreshCurrentChatAndCheckModels", e)
+                _uiState.value = _uiState.value.copy(
+                    errorMessage = "설정 업데이트 중 오류가 발생했어요"
+                )
+            }
+        }
+    }
+    
+
+    
+    /**
      * 채팅방 클리어
      */
     fun clearChat() {
@@ -144,7 +168,7 @@ class ChatViewModel @Inject constructor(
  */
 data class ChatUiState(
     val isTranslating: Boolean = false,
-    val isModelReady: Boolean = false,
+    val isModelReady: Boolean = true, // 앱 시작 시 모든 모델이 다운로드되므로 기본값을 true로 설정
     val inputText: String = "",
     val errorMessage: String? = null
 ) 

@@ -1,8 +1,10 @@
 package com.example.trat.services
 
+import android.util.Log
 import com.google.mlkit.nl.translate.*
 import com.example.trat.data.models.SupportedLanguage
 import com.example.trat.utils.Constants
+import com.example.trat.utils.LanguageModelManager
 
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
@@ -12,7 +14,9 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 @Singleton
-class TranslationService @Inject constructor() {
+class TranslationService @Inject constructor(
+    private val languageModelManager: LanguageModelManager
+) {
     
     private val translators = mutableMapOf<String, Translator>()
     
@@ -33,9 +37,26 @@ class TranslationService @Inject constructor() {
         }
         
         return try {
+            // 먼저 실제 모델 존재 여부를 확인
+            val sourceModelExists = languageModelManager.isModelDownloaded(sourceLanguage)
+            val targetModelExists = languageModelManager.isModelDownloaded(targetLanguage)
+            
+            // 디버깅용 로그
+            Log.d("TranslationService", "Translation request: ${sourceLanguage.displayName} -> ${targetLanguage.displayName}")
+            Log.d("TranslationService", "Source model exists: $sourceModelExists, Target model exists: $targetModelExists")
+            
+            if (!sourceModelExists || !targetModelExists) {
+                val missingModels = mutableListOf<String>()
+                if (!sourceModelExists) missingModels.add(sourceLanguage.displayName)
+                if (!targetModelExists) missingModels.add(targetLanguage.displayName)
+                
+                Log.w("TranslationService", "Missing models: $missingModels")
+                return Result.failure(Exception(Constants.ERROR_MODEL_DOWNLOAD_FAILED))
+            }
+            
             val translator = getOrCreateTranslator(sourceLanguage, targetLanguage)
             
-            // 모델 다운로드 확인
+            // 모델 다운로드 확인 (이중 체크)
             val isModelReady = ensureModelDownloaded(translator)
             if (!isModelReady) {
                 return Result.failure(Exception(Constants.ERROR_MODEL_DOWNLOAD_FAILED))
@@ -46,7 +67,51 @@ class TranslationService @Inject constructor() {
             Result.success(translatedText)
             
         } catch (e: Exception) {
+            // ICU translit 에러인 경우 모델 재설치 시도
+            if (e.message?.contains("ICU translit") == true || 
+                e.message?.contains("transliteration") == true ||
+                e.message?.contains("RET_CHECK failure") == true) {
+                return retryWithModelReinstall(text, sourceLanguage, targetLanguage, e)
+            }
             Result.failure(e)
+        }
+    }
+    
+    /**
+     * 모델 재설치 후 번역 재시도
+     */
+    private suspend fun retryWithModelReinstall(
+        text: String,
+        sourceLanguage: SupportedLanguage,
+        targetLanguage: SupportedLanguage,
+        originalException: Exception
+    ): Result<String> {
+        return try {
+            // 기존 Translator 제거
+            val key = "${sourceLanguage.code}-${targetLanguage.code}"
+            translators.remove(key)
+            
+            // 모델 강제 재다운로드
+            val isModelReinstalled = forceModelRedownload(sourceLanguage, targetLanguage)
+            if (!isModelReinstalled) {
+                return Result.failure(Exception(Constants.ERROR_MODEL_REINSTALL_FAILED))
+            }
+            
+            // 새 Translator 생성 및 번역 재시도
+            val newTranslator = getOrCreateTranslator(sourceLanguage, targetLanguage)
+            val isModelReady = ensureModelDownloaded(newTranslator)
+            
+            if (!isModelReady) {
+                return Result.failure(Exception(Constants.ERROR_MODEL_REINSTALL_FAILED))
+            }
+            
+            // 번역 재시도
+            val translatedText = performTranslation(newTranslator, text)
+            Result.success(translatedText)
+            
+        } catch (e: Exception) {
+            // 재시도도 실패하면 사용자 친화적인 메시지 반환
+            Result.failure(Exception(Constants.ERROR_MODEL_REINSTALL_FAILED))
         }
     }
     
@@ -97,17 +162,43 @@ class TranslationService @Inject constructor() {
         translator: Translator,
         requireWifi: Boolean = true
     ): Boolean {
-        return withTimeoutOrNull(Constants.MODEL_DOWNLOAD_TIMEOUT_MS) {
-            suspendCancellableCoroutine { continuation ->
-                translator.downloadModelIfNeeded()
-                    .addOnSuccessListener {
-                        continuation.resume(true)
-                    }
-                    .addOnFailureListener { exception ->
-                        continuation.resumeWithException(exception)
-                    }
-            }
-        } ?: false
+        return try {
+            withTimeoutOrNull(Constants.MODEL_DOWNLOAD_TIMEOUT_MS) {
+                suspendCancellableCoroutine { continuation ->
+                    translator.downloadModelIfNeeded()
+                        .addOnSuccessListener {
+                            continuation.resume(true)
+                        }
+                        .addOnFailureListener { exception ->
+                            continuation.resumeWithException(exception)
+                        }
+                }
+            } ?: false
+        } catch (e: Exception) {
+            false
+        }
+    }
+    
+    /**
+     * 특정 언어들의 모델을 강제로 재다운로드합니다
+     */
+    private suspend fun forceModelRedownload(
+        sourceLanguage: SupportedLanguage,
+        targetLanguage: SupportedLanguage
+    ): Boolean {
+        return try {
+            // 소스 언어 모델 삭제 및 재다운로드
+            languageModelManager.deleteModel(sourceLanguage)
+            val sourceDownload = languageModelManager.downloadModel(sourceLanguage, requireWifi = false)
+            
+            // 타겟 언어 모델 삭제 및 재다운로드  
+            languageModelManager.deleteModel(targetLanguage)
+            val targetDownload = languageModelManager.downloadModel(targetLanguage, requireWifi = false)
+            
+            sourceDownload.isSuccess && targetDownload.isSuccess
+        } catch (e: Exception) {
+            false
+        }
     }
     
     /**

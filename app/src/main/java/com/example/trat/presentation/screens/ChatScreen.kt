@@ -7,19 +7,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.shadow
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.ArrowForward
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.rounded.Send
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Menu
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -48,6 +45,8 @@ import com.example.trat.ui.theme.TossInputMessage
 import androidx.compose.foundation.shape.CircleShape
 import com.example.trat.data.models.SupportedLanguage
 import com.example.trat.presentation.components.LanguageSettingsDialog
+import com.airbnb.lottie.compose.*
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -101,6 +100,14 @@ fun ChatScreen(
             scope.launch {
                 listState.animateScrollToItem(messages.size - 1)
             }
+        }
+    }
+    
+    // 에러 메시지 토스트 표시
+    LaunchedEffect(uiState.errorMessage) {
+        uiState.errorMessage?.let { message ->
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            viewModel.clearError() // 토스트 표시 후 에러 메시지 클리어
         }
     }
     
@@ -164,6 +171,10 @@ fun ChatScreen(
                     }
                 )
             } else {
+                Surface(
+                    shadowElevation = 4.dp,
+                    color = MaterialTheme.colorScheme.surface
+                ) {
                 TopAppBar(
                     title = {
                             Row(
@@ -189,11 +200,11 @@ fun ChatScreen(
                                                 text = getLanguageFlag(chat.nativeLanguage.code),
                                                 style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp)
                                             )
-                                            Text(
-                                                text = "↔",
-                                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                                                color = TossInputMessage,
-                                                fontWeight = FontWeight.Medium
+                                            Icon(
+                                                imageVector = Icons.Rounded.Refresh,
+                                                contentDescription = "양방향 번역",
+                                                tint = TossInputMessage,
+                                                modifier = Modifier.size(16.dp)
                                             )
                                             Text(
                                                 text = getLanguageFlag(chat.translateLanguage.code),
@@ -214,13 +225,14 @@ fun ChatScreen(
                     },
                     actions = {
                             IconButton(onClick = { isSearching = true }) {
-                                Icon(Icons.Default.Search, contentDescription = "검색")
+                                Icon(Icons.Rounded.Search, contentDescription = "검색")
                             }
-                            IconButton(onClick = { showRightDrawer = true }) {
-                                Icon(Icons.Default.Menu, contentDescription = "메뉴")
+                                                          IconButton(onClick = { showRightDrawer = true }) {
+                                Icon(Icons.Rounded.Menu, contentDescription = "메뉴")
                         }
                     }
                 )
+                }
             }
         },
         bottomBar = {
@@ -348,9 +360,15 @@ fun ChatScreen(
                     showLanguageSettingsDialog = false
                     // 현재 채팅의 타이틀과 언어 설정 업데이트
                     currentChat?.let { chat ->
-                        mainViewModel.updateChatTitleAndLanguages(chat.id, title, nativeLanguage, translateLanguage)
-                        // ChatViewModel의 currentChat도 업데이트
-                        viewModel.refreshCurrentChat()
+                        mainViewModel.updateChatTitleAndLanguages(
+                            chatId = chat.id, 
+                            title = title, 
+                            nativeLanguage = nativeLanguage, 
+                            translateLanguage = translateLanguage
+                        ) {
+                            // 데이터베이스 업데이트 완료 후 ChatViewModel 새로고침
+                            viewModel.refreshCurrentChatAndCheckModels()
+                        }
                     }
                 }
             )
@@ -371,6 +389,7 @@ fun ChatScreen(
                 }
             )
         }
+
     }
 }
 
@@ -389,6 +408,13 @@ private fun EmptyChatState(
     currentChat: Chat?,
     isModelReady: Boolean
 ) {
+    // Lottie 애니메이션 설정
+    val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.trat_lottie))
+    val progress by animateLottieCompositionAsState(
+        composition = composition,
+        iterations = LottieConstants.IterateForever
+    )
+    
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -399,21 +425,20 @@ private fun EmptyChatState(
         ) {
             when {
                 !isModelReady -> {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(40.dp),
-                        strokeWidth = 3.dp
-                    )
+                    // 모델이 준비되지 않았을 때는 빈 상태 표시 (다이얼로그에서 처리)
                     Text(
-                        text = "번역 준비 중...",
+                        text = "언어 모델을 설정해주세요",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 
                 else -> {
-                    Text(
-                        text = "🌍",
-                        style = MaterialTheme.typography.displayLarge.copy(fontSize = 42.sp)
+                    // 로티 애니메이션 (지구본 대신)
+                    LottieAnimation(
+                        composition = composition,
+                        progress = { progress },
+                        modifier = Modifier.size(80.dp),
                     )
                     Text(
                         text = "메시지를 입력하세요",
@@ -421,14 +446,6 @@ private fun EmptyChatState(
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    if (currentChat != null) {
-                        Text(
-                            text = "${getLanguageFlag(currentChat.nativeLanguage.code)} ${currentChat.nativeLanguage.displayName} ↔ ${getLanguageFlag(currentChat.translateLanguage.code)} ${currentChat.translateLanguage.displayName}",
-                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
-                            color = TossInputMessage,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
                 }
             }
         }
@@ -445,13 +462,18 @@ private fun ChatInputBar(
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 4.dp
+        shadowElevation = 8.dp,
+        modifier = Modifier.shadow(
+            elevation = 8.dp,
+            spotColor = Color.Black.copy(alpha = 0.3f),
+            ambientColor = Color.Black.copy(alpha = 0.15f)
+        )
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.Bottom,
+                .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 32.dp),
+            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             OutlinedTextField(
@@ -485,7 +507,7 @@ private fun ChatInputBar(
                     )
                 } else {
                     Icon(
-                        Icons.Default.Send, 
+                        Icons.Rounded.Send, 
                         contentDescription = "전송",
                         modifier = Modifier.size(20.dp)
                     )
@@ -539,8 +561,8 @@ private fun SearchTopAppBar(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp)
-                    .padding(vertical = 4.dp),
+                    .defaultMinSize(minHeight = 56.dp)
+                    .padding(horizontal = 4.dp, vertical = 4.dp),
                 singleLine = true,
                 textStyle = MaterialTheme.typography.bodyMedium,
                 shape = RoundedCornerShape(12.dp),
@@ -554,7 +576,7 @@ private fun SearchTopAppBar(
         },
         navigationIcon = {
             IconButton(onClick = onSearchClose) {
-                Icon(Icons.Default.Close, contentDescription = "검색 닫기")
+                Icon(Icons.Rounded.Close, contentDescription = "검색 닫기")
             }
         },
         actions = {
@@ -565,10 +587,10 @@ private fun SearchTopAppBar(
                     modifier = Modifier.padding(horizontal = 8.dp)
                 )
                 IconButton(onClick = onNavigateToPrevious) {
-                    Icon(Icons.Default.KeyboardArrowUp, contentDescription = "이전 결과")
+                    Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = "이전 결과")
                 }
                 IconButton(onClick = onNavigateToNext) {
-                    Icon(Icons.Default.KeyboardArrowDown, contentDescription = "다음 결과")
+                    Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = "다음 결과")
                 }
             }
         }
@@ -589,7 +611,7 @@ private fun ChatMenuDrawer(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(20.dp)
+            .padding(start = 20.dp, end = 20.dp, bottom = 20.dp, top = 64.dp)
     ) {
         // 헤더
         Row(
@@ -600,9 +622,9 @@ private fun ChatMenuDrawer(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                painter = painterResource(id = R.drawable.logo),
+                painter = painterResource(id = R.drawable.trat_logo_light),
                 contentDescription = "로고",
-                modifier = Modifier.size(28.dp),
+                modifier = Modifier.height(24.dp).width(95.dp),
                 tint = Color.Unspecified  // 원본 색상 유지
             )
             
@@ -716,13 +738,26 @@ private fun ChatItemInMenu(
                     maxLines = 1
                 )
                 
-                // 언어 정보 표시
-                Text(
-                    text = "${getLanguageFlag(chat.nativeLanguage.code)} ↔ ${getLanguageFlag(chat.translateLanguage.code)}",
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                    maxLines = 1
-                )
+                // 언어 정보 표시 (Refresh 아이콘 포함)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = getLanguageFlag(chat.nativeLanguage.code),
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp)
+                    )
+                    Icon(
+                        imageVector = Icons.Rounded.Refresh,
+                        contentDescription = "양방향 번역",
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        modifier = Modifier.size(10.dp)
+                    )
+                    Text(
+                        text = getLanguageFlag(chat.translateLanguage.code),
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp)
+                    )
+                }
             }
             
             if (isEditMode) {
@@ -731,7 +766,7 @@ private fun ChatItemInMenu(
                     modifier = Modifier.size(32.dp)
                 ) {
                     Icon(
-                        Icons.Default.Delete,
+                        Icons.Rounded.Delete,
                         contentDescription = "삭제",
                         tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(18.dp)

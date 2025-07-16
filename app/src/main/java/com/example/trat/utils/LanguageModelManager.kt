@@ -1,5 +1,6 @@
 package com.example.trat.utils
 
+import android.util.Log
 import com.google.mlkit.common.model.DownloadConditions
 import com.google.mlkit.common.model.RemoteModelManager
 import com.google.mlkit.nl.translate.TranslateRemoteModel
@@ -44,8 +45,15 @@ class LanguageModelManager @Inject constructor() {
     suspend fun isModelDownloaded(language: SupportedLanguage): Boolean {
         return try {
             val downloadedModels = getDownloadedModels().getOrNull() ?: emptySet()
-            downloadedModels.contains(language.mlKitLanguage)
+            val isDownloaded = downloadedModels.contains(language.mlKitLanguage)
+            
+            // 디버깅용 로그 (실제 배포 시에는 제거)
+            Log.d("ModelManager", "Checking ${language.displayName} (${language.mlKitLanguage}): $isDownloaded")
+            Log.d("ModelManager", "Downloaded models: $downloadedModels")
+            
+            isDownloaded
         } catch (e: Exception) {
+            Log.e("ModelManager", "Error checking model for ${language.displayName}", e)
             false
         }
     }

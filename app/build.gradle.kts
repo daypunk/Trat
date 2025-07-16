@@ -99,6 +99,9 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     
+    // Lottie Animation
+    implementation("com.airbnb.android:lottie-compose:6.1.0")
+    
     // Splash Screen
     implementation("androidx.core:core-splashscreen:1.0.1")
     

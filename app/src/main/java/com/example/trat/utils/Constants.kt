@@ -13,6 +13,8 @@ object Constants {
     const val ERROR_MODEL_DOWNLOAD_FAILED = "언어 모델 다운로드에 실패했습니다"
     const val ERROR_NETWORK_REQUIRED = "모델 다운로드를 위해 인터넷 연결이 필요합니다"
     const val ERROR_UNSUPPORTED_LANGUAGE = "지원하지 않는 언어입니다"
+    const val ERROR_MODEL_CORRUPTED = "언어 모델에 문제가 있어 재설치합니다"
+    const val ERROR_MODEL_REINSTALL_FAILED = "모델 재설치에 실패했습니다. 앱을 재시작해주세요"
     
     // 성공 메시지
     const val SUCCESS_MODEL_DOWNLOADED = "언어 모델이 다운로드되었습니다"

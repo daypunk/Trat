@@ -3,7 +3,7 @@ package com.example.trat.presentation.components
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -95,7 +95,7 @@ fun LanguageSettingsDialog(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(
-                            Icons.Default.ArrowForward,
+                            Icons.Rounded.Refresh,
                             contentDescription = "양방향 번역",
                             tint = TossInputMessage
                         )
@@ -131,13 +131,13 @@ fun LanguageSettingsDialog(
                     when {
                         isNewChat -> {
                             val finalTitle = title.ifBlank { 
-                                "${fromLanguage.displayName} ↔ ${toLanguage.displayName}" 
+                                "이름없는 번역챗" 
                             }
                             onChatCreated(finalTitle, fromLanguage, toLanguage)
                         }
                         showTitleEdit -> {
                             val finalTitle = title.ifBlank { 
-                                "${fromLanguage.displayName} ↔ ${toLanguage.displayName}" 
+                                "이름없는 번역챗" 
                             }
                             onTitleAndLanguageChanged(finalTitle, fromLanguage, toLanguage)
                         }

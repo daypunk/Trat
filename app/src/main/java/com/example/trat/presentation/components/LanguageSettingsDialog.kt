@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.sp
 import com.example.trat.data.entities.Chat
 import com.example.trat.data.models.SupportedLanguage
 import com.example.trat.ui.theme.Gray300
+import com.example.trat.ui.theme.Gray500
 import com.example.trat.ui.theme.InputMessage
 
 @Composable
@@ -41,8 +42,8 @@ fun LanguageSettingsDialog(
         title = {
             Text(
                 text = when {
-                    isNewChat -> "새 번역 만들기"
-                    showTitleEdit -> "번역창 설정"
+                    isNewChat -> "새 번역챗 만들기"
+                    showTitleEdit -> "번역챗 설정"
                     else -> "언어 설정"
                 },
                 style = MaterialTheme.typography.headlineSmall.copy(fontSize = 20.sp),
@@ -71,7 +72,7 @@ fun LanguageSettingsDialog(
                             singleLine = true,
                             shape = RoundedCornerShape(12.dp),
                             colors = OutlinedTextFieldDefaults.colors(
-                                unfocusedBorderColor = Gray300,
+                                unfocusedBorderColor = Gray500,
                                 focusedBorderColor = InputMessage,
                                 unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                                 focusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
@@ -100,7 +101,7 @@ fun LanguageSettingsDialog(
                             tint = InputMessage
                         )
                         Text(
-                            text = "양방향 번역이 가능해요",
+                            text = "양방향 번역이 가능해요!",
                             style = MaterialTheme.typography.bodyMedium,
                             color = InputMessage
                         )
@@ -198,7 +199,7 @@ private fun LanguageDropdown(
                     ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
                 },
                 colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedBorderColor = Gray300,
+                    unfocusedBorderColor = Gray500,
                     focusedBorderColor = InputMessage
                 ),
                 shape = RoundedCornerShape(12.dp)

@@ -45,6 +45,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import com.example.trat.ui.theme.Gray300
 import com.example.trat.ui.theme.InputMessage
+import com.example.trat.ui.theme.Gray400
 import androidx.compose.foundation.shape.CircleShape
 import com.example.trat.data.models.SupportedLanguage
 import com.example.trat.presentation.components.LanguageSettingsDialog
@@ -237,9 +238,10 @@ fun ChatScreen(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                                         ) {
+                                            // 메인화면 헤더 뱃지 부분
                                             Text(
                                                 text = getLanguageFlag(chat.nativeLanguage.code),
-                                                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp)
+                                                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp)
                                             )
                                             Icon(
                                                 imageVector = Icons.Rounded.Refresh,
@@ -249,7 +251,7 @@ fun ChatScreen(
                                             )
                                             Text(
                                                 text = getLanguageFlag(chat.translateLanguage.code),
-                                                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp)
+                                                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp)
                                             )
                                         }
                                     }
@@ -641,7 +643,7 @@ private fun ChatInputBar(
             FloatingActionButton(
                 onClick = { if (isEnabled) onSendMessage() },
                 modifier = Modifier.size(48.dp),
-                containerColor = if (isEnabled) InputMessage else Gray300,
+                containerColor = if (isEnabled) InputMessage else Gray400,
                 contentColor = Color.White,
                 elevation = FloatingActionButtonDefaults.elevation(
                     defaultElevation = 0.dp,
@@ -933,19 +935,20 @@ private fun ChatItemInMenu(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
+                    // 드로워 채팅 리스트 뱃지 부분
                     Text(
                         text = getLanguageFlag(chat.nativeLanguage.code),
-                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp)
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp)
                     )
                     Icon(
                         imageVector = Icons.Rounded.Refresh,
                         contentDescription = "양방향 번역",
-                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                        modifier = Modifier.size(14.dp)
+                        tint = if (isCurrentChat) InputMessage else Gray400,
+                        modifier = Modifier.size(16.dp)
                     )
                     Text(
                         text = getLanguageFlag(chat.translateLanguage.code),
-                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp)
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp)
                     )
                 }
                 

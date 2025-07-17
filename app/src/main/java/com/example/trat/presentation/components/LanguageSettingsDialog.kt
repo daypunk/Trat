@@ -13,8 +13,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.trat.data.entities.Chat
 import com.example.trat.data.models.SupportedLanguage
-import com.example.trat.ui.theme.TossGray300
-import com.example.trat.ui.theme.TossInputMessage
+import com.example.trat.ui.theme.Gray300
+import com.example.trat.ui.theme.InputMessage
 
 @Composable
 fun LanguageSettingsDialog(
@@ -71,8 +71,8 @@ fun LanguageSettingsDialog(
                             singleLine = true,
                             shape = RoundedCornerShape(12.dp),
                             colors = OutlinedTextFieldDefaults.colors(
-                                unfocusedBorderColor = TossGray300,
-                                focusedBorderColor = TossInputMessage,
+                                unfocusedBorderColor = Gray300,
+                                focusedBorderColor = InputMessage,
                                 unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                                 focusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
                             )
@@ -83,7 +83,7 @@ fun LanguageSettingsDialog(
                 // 양방향 번역 안내
                 Card(
                     colors = CardDefaults.cardColors(
-                        containerColor = TossInputMessage.copy(alpha = 0.1f)
+                        containerColor = InputMessage.copy(alpha = 0.1f)
                     ),
                     shape = RoundedCornerShape(12.dp)
                 ) {
@@ -97,12 +97,12 @@ fun LanguageSettingsDialog(
                         Icon(
                             Icons.Rounded.Refresh,
                             contentDescription = "양방향 번역",
-                            tint = TossInputMessage
+                            tint = InputMessage
                         )
                         Text(
                             text = "양방향 번역이 가능해요",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = TossInputMessage
+                            color = InputMessage
                         )
                     }
                 }
@@ -150,7 +150,7 @@ fun LanguageSettingsDialog(
             ) {
                 Text(
                     text = if (isNewChat) "만들기" else "저장", 
-                    color = TossInputMessage
+                    color = InputMessage
                 )
             }
         },
@@ -198,8 +198,8 @@ private fun LanguageDropdown(
                     ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
                 },
                 colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedBorderColor = TossGray300,
-                    focusedBorderColor = TossInputMessage
+                    unfocusedBorderColor = Gray300,
+                    focusedBorderColor = InputMessage
                 ),
                 shape = RoundedCornerShape(12.dp)
             )

@@ -36,7 +36,7 @@ fun MessageBubble(
             modifier = Modifier
                 .widthIn(min = 60.dp, max = 280.dp)
                 .background(
-                    color = if (message.isUserMessage) TossInputMessage else TossOutputMessage,
+                    color = if (message.isUserMessage) InputMessage else OutputMessage,
                     shape = RoundedCornerShape(
                         topStart = 18.dp,
                         topEnd = 18.dp,
@@ -98,19 +98,16 @@ fun MessageBubble(
 private fun formatTimestamp(timestamp: Long): String {
     val now = System.currentTimeMillis()
     val diff = now - timestamp
-    
     return when {
-        diff < 60 * 1000 -> "방금 전" // 1분 미만
-        diff < 60 * 60 * 1000 -> "${diff / (60 * 1000)}분 전" // 1시간 미만
-        diff < 24 * 60 * 60 * 1000 -> { // 24시간 미만
+        diff < 24 * 60 * 60 * 1000 -> { // 24시간 미만은 HH:mm
             val formatter = SimpleDateFormat("HH:mm", Locale.getDefault())
             formatter.format(Date(timestamp))
         }
-        diff < 7 * 24 * 60 * 60 * 1000 -> { // 7일 미만
+        diff < 7 * 24 * 60 * 60 * 1000 -> { // 7일 미만은 MM/dd HH:mm
             val formatter = SimpleDateFormat("MM/dd HH:mm", Locale.getDefault())
             formatter.format(Date(timestamp))
         }
-        else -> { // 7일 이상
+        else -> { // 7일 이상은 yy/MM/dd
             val formatter = SimpleDateFormat("yy/MM/dd", Locale.getDefault())
             formatter.format(Date(timestamp))
         }
@@ -119,7 +116,7 @@ private fun formatTimestamp(timestamp: Long): String {
 
 @Composable
 private fun buildHighlightedText(text: String, searchQuery: String) = buildAnnotatedString {
-    val highlightColor = TossGray800
+    val highlightColor = Gray800
     var startIndex = 0
     
     while (startIndex < text.length) {
@@ -136,7 +133,7 @@ private fun buildHighlightedText(text: String, searchQuery: String) = buildAnnot
         withStyle(
             style = SpanStyle(
                 background = Color.Yellow.copy(alpha = 0.7f),
-                color = TossGray900
+                color = Gray900
             )
         ) {
             append(text.substring(index, index + searchQuery.length))

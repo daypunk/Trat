@@ -43,8 +43,8 @@ import com.example.trat.R
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
-import com.example.trat.ui.theme.TossGray300
-import com.example.trat.ui.theme.TossInputMessage
+import com.example.trat.ui.theme.Gray300
+import com.example.trat.ui.theme.InputMessage
 import androidx.compose.foundation.shape.CircleShape
 import com.example.trat.data.models.SupportedLanguage
 import com.example.trat.presentation.components.LanguageSettingsDialog
@@ -227,7 +227,7 @@ fun ChatScreen(
                                     Card(
                                         modifier = Modifier.clickable { showLanguageSettingsDialog = true },
                                         colors = CardDefaults.cardColors(
-                                            containerColor = TossInputMessage.copy(alpha = 0.1f)
+                                            containerColor = InputMessage.copy(alpha = 0.1f)
                                         ),
                                         shape = RoundedCornerShape(16.dp),
                                         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
@@ -244,7 +244,7 @@ fun ChatScreen(
                                             Icon(
                                                 imageVector = Icons.Rounded.Refresh,
                                                 contentDescription = "양방향 번역",
-                                                tint = TossInputMessage,
+                                                tint = InputMessage,
                                                 modifier = Modifier.size(16.dp)
                                             )
                                             Text(
@@ -569,8 +569,8 @@ private fun ChatInputBar(
                 shape = RoundedCornerShape(20.dp),
                 enabled = !isTranslating && isModelReady,
                 colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedBorderColor = TossGray300,
-                    focusedBorderColor = TossInputMessage,
+                    unfocusedBorderColor = Gray300,
+                    focusedBorderColor = InputMessage,
                     unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                     focusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
                 ),
@@ -641,7 +641,7 @@ private fun ChatInputBar(
             FloatingActionButton(
                 onClick = { if (isEnabled) onSendMessage() },
                 modifier = Modifier.size(48.dp),
-                containerColor = if (isEnabled) TossInputMessage else TossGray300,
+                containerColor = if (isEnabled) InputMessage else Gray300,
                 contentColor = Color.White,
                 elevation = FloatingActionButtonDefaults.elevation(
                     defaultElevation = 0.dp,
@@ -764,8 +764,8 @@ private fun SearchTopAppBar(
                 textStyle = MaterialTheme.typography.bodyMedium,
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedBorderColor = TossGray300,
-                    focusedBorderColor = TossInputMessage,
+                    unfocusedBorderColor = Gray300,
+                    focusedBorderColor = InputMessage,
                     unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                     focusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
                 )
@@ -830,7 +830,7 @@ private fun ChatMenuDrawer(
                     TextButton(onClick = onCreateChatClick) {
                         Text(
                             text = "+ 새 번역", 
-                            color = TossInputMessage,
+                            color = InputMessage,
                             fontWeight = FontWeight.SemiBold,
                             style = MaterialTheme.typography.bodyMedium
                         )
@@ -900,7 +900,7 @@ private fun ChatItemInMenu(
             ),
         colors = CardDefaults.cardColors(
             containerColor = if (isCurrentChat) {
-                TossInputMessage.copy(alpha = 0.1f)
+                InputMessage.copy(alpha = 0.1f)
             } else {
                 MaterialTheme.colorScheme.surface
             }
@@ -954,7 +954,7 @@ private fun ChatItemInMenu(
                     text = chat.title,
                     style = MaterialTheme.typography.titleSmall.copy(fontSize = 16.sp),
                     fontWeight = if (isCurrentChat) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (isCurrentChat) TossInputMessage else MaterialTheme.colorScheme.onSurface,
+                    color = if (isCurrentChat) InputMessage else MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -971,7 +971,7 @@ private fun ChatItemInMenu(
                         modifier = Modifier
                             .size(8.dp)
                             .background(
-                                color = TossInputMessage,
+                                color = InputMessage,
                                 shape = CircleShape
                             )
                     )

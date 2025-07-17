@@ -75,6 +75,7 @@ import androidx.compose.ui.unit.IntOffset
 fun ChatScreen(
     chatId: String,
     onNavigateToChat: (String) -> Unit = {},
+    onNavigateToMain: () -> Unit = {},
     viewModel: ChatViewModel = hiltViewModel(),
     mainViewModel: MainViewModel = hiltViewModel()
 ) {
@@ -108,6 +109,9 @@ fun ChatScreen(
     
     // 새 채팅 생성 다이얼로그 상태
     var showNewChatDialog by remember { mutableStateOf(false) }
+    
+    // 드로워 상태 추적 (이전 상태를 기억하기 위함)
+    var previousDrawerState by remember { mutableStateOf(false) }
     
     val context = LocalContext.current
     
@@ -144,6 +148,19 @@ fun ChatScreen(
             Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
             viewModel.clearSttError()
         }
+    }
+    
+    // 모든 채팅 삭제 후 드로워 닫힘 감지
+    LaunchedEffect(showRightDrawer, chats.size) {
+        // 드로워가 열려있다가 닫혔을 때 (true → false)
+        if (previousDrawerState && !showRightDrawer) {
+            // 모든 채팅이 삭제되었다면 MainScreen으로 네비게이션
+            if (chats.isEmpty()) {
+                onNavigateToMain()
+            }
+        }
+        // 현재 드로워 상태를 이전 상태로 저장
+        previousDrawerState = showRightDrawer
     }
     
     // 음성 인식 결과 처리
@@ -427,7 +444,14 @@ fun ChatScreen(
             LanguageSettingsDialog(
                 currentChat = null,
                 isNewChat = true,
-                onDismiss = { showNewChatDialog = false },
+                onDismiss = { 
+                    // 채팅이 없는 경우 앱 종료
+                    if (chats.isEmpty()) {
+                        (context as? androidx.activity.ComponentActivity)?.finish()
+                    } else {
+                        showNewChatDialog = false
+                    }
+                },
                 onChatCreated = { title, nativeLanguage, translateLanguage ->
                     showNewChatDialog = false
                     mainViewModel.createChat(title, nativeLanguage, translateLanguage) { chatId ->
@@ -687,7 +711,7 @@ private fun SpeechRecognitionLoadingPopup(
             onDismiss()
         },
         alignment = Alignment.BottomCenter,
-        offset = IntOffset(0, -320), // 더 위쪽으로 이동
+        offset = IntOffset(0, -380), // 더 위쪽으로 이동
         properties = PopupProperties(
             dismissOnBackPress = true,
             dismissOnClickOutside = false, // 🛡️ 외부 클릭으로 dismiss 방지 (터치 이벤트 전파 차단)
@@ -695,7 +719,7 @@ private fun SpeechRecognitionLoadingPopup(
         )
     ) {
         Card(
-            modifier = Modifier.size(width = 60.dp, height = 48.dp), // 높이 줄임
+            modifier = Modifier.size(width = 72.dp, height = 48.dp), // 높이 줄임
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surface
             ),
@@ -709,7 +733,7 @@ private fun SpeechRecognitionLoadingPopup(
                 LottieAnimation(
                     composition = composition,
                     progress = { progress },
-                    modifier = Modifier.size(52.dp) // 애니메이션 크기 증가
+                    modifier = Modifier.size(60.dp) // 애니메이션 크기 증가
                 )
             }
         }

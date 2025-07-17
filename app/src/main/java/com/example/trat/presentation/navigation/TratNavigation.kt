@@ -49,6 +49,13 @@ fun TratNavigation(
                         launchSingleTop = true
                         restoreState = true
                     }
+                },
+                onNavigateToMain = {
+                    navController.navigate(TratRoutes.MAIN) {
+                        popUpTo(navController.graph.startDestinationId) {
+                            inclusive = true
+                        }
+                    }
                 }
             )
         }

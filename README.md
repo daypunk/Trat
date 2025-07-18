@@ -20,6 +20,7 @@ Trat은 ML Kit을 활용한 **오프라인 실시간 번역 앱**입니다.
 - **완전 오프라인 번역**: Google ML Kit 기반 로컬 번역 모델 사용
 - **양방향 번역**: 설정된 두 언어 간 자동 방향 감지 및 번역
 - **음성 입력**: STT 기반 음성 번역 (한국어, 영어, 일본어, 중국어)
+- **음성 출력**: TTS 기반 번역 결과 음성 재생 (4개국어 지원)
 - **채팅 기반 UI**: 메시지 형태로 번역 히스토리 관리
 - **다중 채팅방**: 언어별 번역방 생성 및 관리
 - **고급 검색**: 번역 내용 전체 검색 및 하이라이트
@@ -51,6 +52,7 @@ Trat은 ML Kit을 활용한 **오프라인 실시간 번역 앱**입니다.
 **번역 & AI**
 - **ML Kit Translate**: 오프라인 텍스트 번역
 - **Android Speech Recognizer**: 실시간 음성 인식 (STT)
+- **Android TextToSpeech**: 번역 결과 음성 출력 (TTS)
 - **언어 감지**: 자동 입력 언어 판별을 통해 유연한 언어 설정 가능
 
 **성능 최적화**
@@ -87,6 +89,7 @@ domain/
   - `TranslationUseCase`: 번역 로직
   - `LanguageDetectionUseCase`: 언어 감지
   - `SpeechToTextUseCase`: 음성 인식 처리
+  - `TtsUseCase`: 음성 출력 처리
   - `MessageTranslationUseCase`: 메시지 번역 통합 처리
 
 #### 3. Data Layer (데이터 계층)

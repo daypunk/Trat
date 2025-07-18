@@ -5,10 +5,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.trat.data.entities.Chat
 import com.example.trat.data.entities.Message
+import com.example.trat.data.models.SupportedLanguage
 import com.example.trat.domain.usecase.ChatManagementUseCase
 import com.example.trat.domain.usecase.MessageUseCase
 import com.example.trat.domain.usecase.MessageTranslationUseCase
 import com.example.trat.domain.usecase.SpeechToTextUseCase
+import com.example.trat.domain.usecase.TtsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
@@ -21,7 +23,8 @@ class ChatViewModel @Inject constructor(
     private val chatManagementUseCase: ChatManagementUseCase,
     private val messageUseCase: MessageUseCase,
     private val messageTranslationUseCase: MessageTranslationUseCase,
-    private val speechToTextUseCase: SpeechToTextUseCase
+    private val speechToTextUseCase: SpeechToTextUseCase,
+    private val ttsUseCase: TtsUseCase
 ) : BaseViewModel<ChatUiState>() {
     
     // UI 상태
@@ -66,10 +69,27 @@ class ChatViewModel @Inject constructor(
                 
                 // 앱 시작 시 모든 모델이 다운로드되므로 항상 준비된 상태로 설정
                 updateUiState { copy(isModelReady = true) }
+                
+                // TTS 초기화
+                ttsUseCase.initialize()
             } else {
                 setError("채팅방을 찾을 수 없어요")
             }
         }
+    }
+    
+    /**
+     * TTS로 메시지 읽기
+     */
+    fun speakMessage(text: String, language: SupportedLanguage) {
+        ttsUseCase.speak(text, language)
+    }
+    
+    /**
+     * TTS 중지
+     */
+    fun stopTts() {
+        ttsUseCase.stop()
     }
     
     /**

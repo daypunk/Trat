@@ -52,15 +52,13 @@ class MessageTranslationUseCase @Inject constructor(
             targetLanguage = targetLanguage
         )
         
-        // 6. 번역 결과가 원본과 다르면 번역 메시지도 저장
-        if (translatedText != inputText) {
-            messageUseCase.saveMessageAndUpdateChatTime(
-                chatId = chatId,
-                originalText = translatedText,
-                translatedText = translatedText,
-                isUserMessage = false
-            )
-        }
+        // 6. 번역 결과를 output 메시지로 항상 저장 (TTS 기능을 위해)
+        messageUseCase.saveMessageAndUpdateChatTime(
+            chatId = chatId,
+            originalText = translatedText,
+            translatedText = translatedText,
+            isUserMessage = false
+        )
         
         Log.d("MessageTranslationUseCase", "Message processed: $inputText → $translatedText")
         return translatedText

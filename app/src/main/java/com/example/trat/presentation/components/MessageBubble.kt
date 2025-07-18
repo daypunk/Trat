@@ -8,13 +8,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.trat.R
 import com.example.trat.data.entities.Message
+import com.example.trat.data.models.SupportedLanguage
 import com.example.trat.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -23,60 +26,121 @@ import java.util.*
 fun MessageBubble(
     message: Message,
     isHighlighted: Boolean = false,
-    searchQuery: String = ""
+    searchQuery: String = "",
+    onSpeakMessage: ((String, SupportedLanguage) -> Unit)? = null
 ) {
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp),
         horizontalAlignment = if (message.isUserMessage) Alignment.End else Alignment.Start
     ) {
-        // 메시지 버블
-        Box(
-            modifier = Modifier
-                .widthIn(min = 60.dp, max = 280.dp)
-                .background(
-                    color = if (message.isUserMessage) InputMessage else OutputMessage,
-                    shape = RoundedCornerShape(
-                        topStart = 18.dp,
-                        topEnd = 18.dp,
-                        bottomStart = if (message.isUserMessage) 18.dp else 6.dp,
-                        bottomEnd = if (message.isUserMessage) 6.dp else 18.dp
-                    )
-                )
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-        ) {
-            Column {
-                // 원본 텍스트만 표시 (토스 스타일: 간소화)
-                Text(
-                    text = if (searchQuery.isNotBlank()) {
-                        buildHighlightedText(
-                            text = if (message.originalText != message.translatedText) {
-                                "${message.originalText}\n${message.translatedText}"
-                            } else {
-                                message.originalText
-                            },
-                            searchQuery = searchQuery
+        // 메시지 버블 + TTS 아이콘
+        if (message.isUserMessage) {
+            // User 메시지: 오른쪽 정렬, TTS 아이콘 없음
+            Box(
+                modifier = Modifier
+                    .widthIn(min = 60.dp, max = 280.dp)
+                    .background(
+                        color = InputMessage,
+                        shape = RoundedCornerShape(
+                            topStart = 18.dp,
+                            topEnd = 18.dp,
+                            bottomStart = 18.dp,
+                            bottomEnd = 6.dp
                         )
-                    } else {
-                        buildAnnotatedString {
-                            append(message.originalText)
-                            // 번역이 다른 경우 번역된 텍스트도 보여주되, 구분선 없이 자연스럽게
-                            if (message.originalText != message.translatedText) {
-                                append("\n")
-                                withStyle(style = SpanStyle(fontSize = 14.sp, color = Color.White.copy(alpha = 0.85f))) {
-                                    append(message.translatedText)
+                    )
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            ) {
+                Column {
+                    Text(
+                        text = if (searchQuery.isNotBlank()) {
+                            buildHighlightedText(
+                                text = message.originalText,
+                                searchQuery = searchQuery
+                            )
+                        } else {
+                            buildAnnotatedString { append(message.originalText) }
+                        },
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontSize = 16.sp,
+                            lineHeight = 20.sp
+                        ),
+                        color = Color.White,
+                        fontWeight = FontWeight.Normal
+                    )
+                }
+            }
+        } else {
+            // Output 메시지: 왼쪽 정렬, TTS 아이콘 오른쪽에 붙임
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .widthIn(min = 60.dp, max = 240.dp)
+                        .background(
+                            color = OutputMessage,
+                            shape = RoundedCornerShape(
+                                topStart = 18.dp,
+                                topEnd = 18.dp,
+                                bottomStart = 6.dp,
+                                bottomEnd = 18.dp
+                            )
+                        )
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
+                    Column {
+                        Text(
+                            text = if (searchQuery.isNotBlank()) {
+                                buildHighlightedText(
+                                    text = if (message.originalText != message.translatedText) {
+                                        "${message.originalText}\n${message.translatedText}"
+                                    } else {
+                                        message.originalText
+                                    },
+                                    searchQuery = searchQuery
+                                )
+                            } else {
+                                buildAnnotatedString {
+                                    append(message.originalText)
+                                    if (message.originalText != message.translatedText) {
+                                        append("\n")
+                                        withStyle(style = SpanStyle(fontSize = 14.sp, color = Color.White.copy(alpha = 0.85f))) {
+                                            append(message.translatedText)
+                                        }
+                                    }
                                 }
-                            }
-                        }
-                    },
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontSize = 16.sp,
-                        lineHeight = 20.sp
-                    ),
-                    color = Color.White,
-                    fontWeight = FontWeight.Normal
-                )
+                            },
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontSize = 16.sp,
+                                lineHeight = 20.sp
+                            ),
+                            color = Color.White,
+                            fontWeight = FontWeight.Normal
+                        )
+                    }
+                }
+                
+                // TTS 스피커 아이콘 (Output 메시지 오른쪽에 고정)
+                if (onSpeakMessage != null) {
+                    IconButton(
+                        onClick = { 
+                            val textToSpeak = message.translatedText
+                            onSpeakMessage(textToSpeak, SupportedLanguage.KOREAN)
+                        },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_tts),
+                            contentDescription = "음성으로 듣기",
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
             }
         }
         

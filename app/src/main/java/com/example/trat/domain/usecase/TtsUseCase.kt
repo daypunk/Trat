@@ -21,6 +21,10 @@ class TtsUseCase @Inject constructor(
         }
     }
     
+    fun isLanguageSupported(language: SupportedLanguage): Boolean {
+        return ttsRepository.isLanguageSupported(language)
+    }
+    
     fun stop() {
         ttsRepository.stop()
     }

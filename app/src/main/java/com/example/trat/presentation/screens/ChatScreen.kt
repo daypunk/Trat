@@ -335,11 +335,11 @@ fun ChatScreen(
                             isHighlighted = searchResults.isNotEmpty() && 
                                 searchResults.getOrNull(currentSearchIndex) == messages.indexOf(message),
                             searchQuery = if (isSearching) searchQuery else "",
-                            onSpeakMessage = { text, _ ->
-                                // 현재 채팅의 타겟 언어로 TTS 실행
-                                currentChat?.let { chat ->
-                                    viewModel.speakMessage(text, chat.translateLanguage)
-                                }
+                            onSpeakMessage = { text, language ->
+                                viewModel.speakMessage(text, language)
+                            },
+                            isTtsSupported = { language ->
+                                viewModel.isTtsLanguageSupported(language)
                             }
                         )
                     }

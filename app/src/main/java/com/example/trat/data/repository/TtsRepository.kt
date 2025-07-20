@@ -27,6 +27,12 @@ class TtsRepository @Inject constructor(
     private val _isSpeaking = MutableStateFlow(false)
     override val isSpeaking: StateFlow<Boolean> = _isSpeaking.asStateFlow()
     
+    // 지원되는 언어 목록 (삼성 TTS 기준)
+    private val supportedLanguages = setOf(
+        SupportedLanguage.KOREAN,
+        SupportedLanguage.ENGLISH
+    )
+    
     override fun initialize() {
         if (textToSpeech != null) return
         
@@ -58,7 +64,17 @@ class TtsRepository @Inject constructor(
         })
     }
     
+    override fun isLanguageSupported(language: SupportedLanguage): Boolean {
+        return supportedLanguages.contains(language)
+    }
+    
     override fun speak(text: String, language: SupportedLanguage) {
+        // 지원되지 않는 언어 체크
+        if (!isLanguageSupported(language)) {
+            Log.w("TTS", "${language.displayName} 언어는 TTS에서 지원되지 않습니다")
+            return
+        }
+        
         textToSpeech?.let { tts ->
             val locale = when (language.code) {
                 "ko" -> Locale.KOREA

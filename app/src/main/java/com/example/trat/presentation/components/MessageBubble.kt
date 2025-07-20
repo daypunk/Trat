@@ -19,6 +19,7 @@ import com.example.trat.R
 import com.example.trat.data.entities.Message
 import com.example.trat.data.models.SupportedLanguage
 import com.example.trat.ui.theme.*
+import com.example.trat.utils.LanguageDetector
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -27,7 +28,8 @@ fun MessageBubble(
     message: Message,
     isHighlighted: Boolean = false,
     searchQuery: String = "",
-    onSpeakMessage: ((String, SupportedLanguage) -> Unit)? = null
+    onSpeakMessage: ((String, SupportedLanguage) -> Unit)? = null,
+    isTtsSupported: ((SupportedLanguage) -> Boolean)? = null
 ) {
 
     Column(
@@ -73,7 +75,7 @@ fun MessageBubble(
                 }
             }
         } else {
-            // Output 메시지: 왼쪽 정렬, TTS 아이콘 오른쪽에 붙임
+            // Output 메시지: 왼쪽 정렬, TTS 아이콘 조건부 표시
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -124,21 +126,29 @@ fun MessageBubble(
                     }
                 }
                 
-                // TTS 스피커 아이콘 (Output 메시지 오른쪽에 고정)
-                if (onSpeakMessage != null) {
-                    IconButton(
-                        onClick = { 
-                            val textToSpeak = message.translatedText
-                            onSpeakMessage(textToSpeak, SupportedLanguage.KOREAN)
-                        },
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_tts),
-                            contentDescription = "음성으로 듣기",
-                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
-                            modifier = Modifier.size(22.dp)
-                        )
+                // TTS 스피커 아이콘 (지원되는 언어에서만 표시)
+                if (onSpeakMessage != null && isTtsSupported != null) {
+                    // TTS로 재생할 텍스트의 언어 감지
+                    val textToSpeakLanguage = LanguageDetector.detectLanguage(message.translatedText)
+                    
+                    // 일본어나 중국어가 아니고, TTS가 지원되는 언어인 경우에만 아이콘 표시
+                    if (textToSpeakLanguage != SupportedLanguage.JAPANESE && 
+                        textToSpeakLanguage != SupportedLanguage.CHINESE &&
+                        isTtsSupported(textToSpeakLanguage)) {
+                        IconButton(
+                            onClick = { 
+                                val textToSpeak = message.translatedText
+                                onSpeakMessage(textToSpeak, textToSpeakLanguage)
+                            },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_tts),
+                                contentDescription = "음성으로 듣기",
+                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
                     }
                 }
             }

@@ -86,6 +86,13 @@ class ChatViewModel @Inject constructor(
     }
     
     /**
+     * TTS 언어 지원 여부 확인
+     */
+    fun isTtsLanguageSupported(language: SupportedLanguage): Boolean {
+        return ttsUseCase.isLanguageSupported(language)
+    }
+    
+    /**
      * TTS 중지
      */
     fun stopTts() {

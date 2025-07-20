@@ -11,4 +11,5 @@ interface TtsRepositoryInterface {
     fun speak(text: String, language: SupportedLanguage)
     fun stop()
     fun shutdown()
+    fun isLanguageSupported(language: SupportedLanguage): Boolean
 }

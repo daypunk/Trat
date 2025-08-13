@@ -223,8 +223,9 @@ fun ChatScreen(
         if (searchQuery.isNotBlank()) {
             val results = mutableListOf<Int>()
             messages.forEachIndexed { index, message ->
-                if (message.originalText.contains(searchQuery, ignoreCase = true) ||
-                    message.translatedText.contains(searchQuery, ignoreCase = true)) {
+                val q = searchQuery.trim()
+                if (message.originalText.contains(q, ignoreCase = true) ||
+                    message.translatedText.contains(q, ignoreCase = true)) {
                     results.add(index)
                 }
             }
@@ -874,8 +875,8 @@ private fun SearchTopAppBar(
     val context = LocalContext.current
     var lastShowToastTime by remember { mutableStateOf(0L) }
     
-    // 디바운싱을 위한 LaunchedEffect
-    LaunchedEffect(searchQuery) {
+    // 디바운싱을 위한 LaunchedEffect (검색 결과 변경 시 이전 작업 취소되도록 포함)
+    LaunchedEffect(searchQuery, searchResults) {
         if (searchQuery.isNotBlank()) {
             // 입력 후 500ms 기다림 (디바운싱)
             kotlinx.coroutines.delay(500)

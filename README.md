@@ -13,7 +13,7 @@
 
 채팅방은 로컬 DB에 저장되며, 검색 기능도 제공합니다!
 
-무엇보다, **트랫**은 빠르고 깔끔합니다 😜
+무엇보다, **트랫**은 가볍고 빠르게 동작합니다.
 
 ## 핵심 기능
 
@@ -47,7 +47,7 @@
 - **Hilt**: 의존성 주입 (Dependency Injection)
 - **Room**: 로컬 데이터베이스 (SQLite 기반)
 - **ViewModel & StateFlow**: MVVM 패턴
-- **Navigation Component**: 화면 전환 관리
+- **Navigation for Compose**: 화면 전환 관리
 
 **번역 & AI**
 - **ML Kit Translate**: 오프라인 텍스트 번역
@@ -57,55 +57,49 @@
 
 **성능 최적화**
 - **Coroutines & Flow**: 비동기 처리 및 반응형 프로그래밍
-- **DataStore**: 캐싱 시스템
+- **캐싱 레이어**: 자주 조회되는 데이터 최소화
 - **DB 인덱싱**: 검색 최적화
 
 ## 프로젝트 구조
 
-#### 1. Presentation Layer (UI 계층)
 ```
-presentation/
-├── components/          # 재사용 가능한 UI 컴포넌트
-├── screens/            # 화면별 Composable
-├── navigation/         # 앱 내 네비게이션 관리
-└── viewmodels/         # MVVM의 ViewModel (UI 상태 관리)
-```
-
-**역할**: 사용자 인터페이스와 사용자 상호작용 처리
-- **ViewModels**: UI 상태 관리, 비즈니스 로직 호출
-- **Composables**: 선언형 UI
-- **Navigation**: 화면 전환 로직
-
-#### 2. Domain Layer (비즈니스 로직 계층)
-```
-domain/
-├── usecase/           # 비즈니스 로직 구현체
-└── repository/        # 데이터 접근 인터페이스
-```
-
-**역할**: 앱의 핵심 비즈니스 로직을 담당하는 순수한 코틀린 모듈
-- **Use Cases**: 단일 책임 원칙에 따른 기능별 로직 분리
-  - `ChatManagementUseCase`: 채팅방 CRUD
-  - `TranslationUseCase`: 번역 로직
-  - `LanguageDetectionUseCase`: 언어 감지
-  - `SpeechToTextUseCase`: 음성 인식 처리
-  - `TtsUseCase`: 음성 출력 처리
-  - `MessageTranslationUseCase`: 메시지 번역 통합 처리
-
-#### 3. Data Layer (데이터 계층)
-```
-data/
-├── entities/          # Room 데이터베이스 엔티티
-├── dao/              # 데이터 접근 객체
-├── database/         # 데이터베이스 설정
-├── repository/       # Repository 패턴 구현
-└── models/           # 데이터 모델
+app/src/main/java/com/example/trat/
+├── data/
+│   ├── converters/
+│   ├── dao/
+│   ├── database/
+│   ├── entities/
+│   ├── models/
+│   └── repository/
+├── di/
+├── domain/
+│   ├── repository/
+│   ├── service/
+│   └── usecase/
+├── presentation/
+│   ├── components/
+│   ├── navigation/
+│   ├── screens/
+│   └── viewmodels/
+├── services/
+├── ui/
+│   └── theme/
+├── utils/
+├── MainActivity.kt
+└── TratApplication.kt
 ```
 
-**역할**: 데이터 저장, 조회, 관리
-- **Repository Pattern**: 데이터 소스 추상화
-- **Room Database**: 로컬 데이터 영속성
-- **DAO**: 타입 안전한 데이터베이스 접근
+### 계층 역할
+
+#### Presentation (UI)
+- 선언형 UI(Compose), 화면 전환, 상태 관리(ViewModel/StateFlow)
+
+#### Domain (비즈니스 로직)
+- 순수 Kotlin 모듈 중심
+- Use Cases 예시: `ChatManagementUseCase`, `TranslationUseCase`, `LanguageDetectionUseCase`, `SpeechToTextUseCase`, `TtsUseCase`, `MessageTranslationUseCase`, `MessageUseCase`
+
+#### Data (데이터)
+- Room 기반 영속성, Repository 패턴, DAO/Entity/Database 구성
 
 ### 의존성 주입 (DI)
 ```
@@ -162,8 +156,7 @@ di/
 
 ## STT (Speech-to-Text)
 
-STT는 온라인에서만 가능합니다.
-모델이 너무 크기에...
+STT는 온라인에서만 동작합니다. 온디바이스 STT 모델은 용량 제약으로 포함하지 않았습니다.
 
 ### 아키텍처 구현
 ```kotlin
@@ -177,12 +170,12 @@ class ChatViewModel                       // Presentation Layer
 
 ## 성능 최적화 전략
 
-### 1. 번역 캐싱 시스템
+### 1. 캐싱 전략
 ```kotlin
 // LRU 캐시를 활용한 메모리 + 디스크 캐싱
 class TranslationCacheService {
     private val memoryCache = LinkedHashMap<String, String>(100, 0.75f, true)
-    private val dataStore = context.translationCacheDataStore // DataStore 기반 디스크 캐시
+    // 디스크 캐시는 환경에 맞게 주입해 사용할 수 있습니다.
 }
 ```
 
@@ -207,6 +200,19 @@ class ChatViewModel : BaseViewModel() {
 }
 ```
 
+## 시스템 UI/IME 처리
+
+화면과 시스템 바/키보드가 겹치지 않도록 다음 원칙을 적용합니다.
+
+- MainActivity에서 edge-to-edge 활성화: `WindowCompat.setDecorFitsSystemWindows(window, false)`
+- `Scaffold`의 기본 인셋 비활성화: `contentWindowInsets = WindowInsets(0, 0, 0, 0)`
+- 최상위 컨테이너에 인셋 처리 일원화
+  - 키보드 대응: `Modifier.imePadding()`
+  - 내비게이션 바 회피: `Modifier.windowInsetsPadding(WindowInsets.navigationBars)`
+- 목록과 입력창 동기 스크롤
+  - `LazyColumn` 하단에 앵커를 두고, IME 표시 시 하단으로 bring-into-view 처리
+  - 초기 진입 시 메시지 로드 및 입력창 높이 측정 이후 1회 하단 정렬
+
 ## 개발 환경 및 빌드
 
 ### 요구사항
@@ -214,7 +220,7 @@ class ChatViewModel : BaseViewModel() {
 - **Minimum SDK**: 24 (Android 7.0)
 - **Target SDK**: 35 (Android 15)
 - **Kotlin**: 2.0.21
-- **Compose**: 2024.09.00
+- **Compose BOM**: 2024.09.00
 
 ### 빌드 명령어
 ```bash

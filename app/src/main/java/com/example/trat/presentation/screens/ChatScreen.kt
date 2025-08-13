@@ -68,9 +68,23 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.animateScrollBy
 
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun ChatScreen(
     chatId: String,
@@ -90,6 +104,7 @@ fun ChatScreen(
     val sttError by viewModel.sttError.collectAsStateWithLifecycle()
     
     val listState = rememberLazyListState()
+    val bottomAnchor = remember { BringIntoViewRequester() }
     val scope = rememberCoroutineScope()
     
     // 사이드 드로어 상태
@@ -114,6 +129,9 @@ fun ChatScreen(
     var previousDrawerState by remember { mutableStateOf(false) }
     
     val context = LocalContext.current
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    var inputBarHeightPx by remember { mutableStateOf(0) }
     
     // 모델 다운로드 상태 확인 및 마지막 채팅 저장
     LaunchedEffect(chatId) {
@@ -125,12 +143,42 @@ fun ChatScreen(
         }
     }
     
-    // 새 메시지가 추가되면 스크롤
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty() && !isSearching) {
-            scope.launch {
-                listState.animateScrollToItem(messages.size - 1)
-            }
+    // 하단 여부 및 전송 후 스크롤 플래그
+    var pendingScrollAfterSend by remember { mutableStateOf(false) }
+    val isAtBottom by remember(messages.size) {
+        derivedStateOf {
+            val layoutInfo = listState.layoutInfo
+            val total = layoutInfo.totalItemsCount
+            if (total == 0) return@derivedStateOf true
+            val lastVisible = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+            lastVisible >= total - 2
+        }
+    }
+    // 앱 최초 오픈(해당 chatId 최초 진입) 시, 메시지와 입력바 측정 후 1회 하단 스크롤
+    var didInitialScroll by remember(chatId) { mutableStateOf(false) }
+    LaunchedEffect(messages.size, inputBarHeightPx) {
+        if (!didInitialScroll && messages.isNotEmpty()) {
+            listState.scrollToItem(messages.size - 1)
+            didInitialScroll = true
+        }
+    }
+    // IME(키보드) 가시성 변화 시 최초 표시 타이밍에 하단으로 스크롤
+    val imeVisible = androidx.compose.foundation.layout.WindowInsets.ime.getBottom(density) > 0
+    LaunchedEffect(imeVisible, inputBarHeightPx) {
+        if (imeVisible && messages.isNotEmpty() && isAtBottom && !isSearching) {
+            // 레이아웃 재계산 이후 약간의 여유를 두고 2단계로 하단 정렬 시도
+            kotlinx.coroutines.delay(120)
+            listState.animateScrollToItem(messages.size - 1)
+            // 남은 미세 오프셋은 직접 하단 앵커를 화면에 보이도록 요청
+            kotlinx.coroutines.delay(60)
+            bottomAnchor.bringIntoView()
+        }
+    }
+    // 새 메시지 추가 시: 사용자가 하단이거나 전송 직후면 즉시 하단으로
+    LaunchedEffect(messages.size, isAtBottom, pendingScrollAfterSend) {
+        if (messages.isNotEmpty() && !isSearching && (isAtBottom || pendingScrollAfterSend)) {
+            listState.scrollToItem(messages.size - 1)
+            pendingScrollAfterSend = false
         }
     }
     
@@ -194,9 +242,18 @@ fun ChatScreen(
         }
     }
     
+    // 입력창 포커스 기반 간단한 자동 스크롤
+    var isInputFocused by remember { mutableStateOf(false) }
+    LaunchedEffect(isInputFocused) {
+        if (isInputFocused && messages.isNotEmpty() && !isSearching) {
+            listState.scrollToItem(messages.size - 1)
+        }
+    }
+
     // 메인 컨텐츠
     Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             if (isSearching) {
                 SearchTopAppBar(
@@ -235,6 +292,11 @@ fun ChatScreen(
                     color = MaterialTheme.colorScheme.surface
                 ) {
                 TopAppBar(
+                    modifier = Modifier
+                        .statusBarsPadding()
+                        .pointerInput(Unit) {
+                            detectTapGestures(onTap = { focusManager.clearFocus() })
+                        },
                     title = {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -297,23 +359,17 @@ fun ChatScreen(
                 }
             }
         },
-        bottomBar = {
-            ChatInputBar(
-                inputText = uiState.inputText,
-                onInputChange = viewModel::updateInputText,
-                onSendMessage = { viewModel.sendMessage(uiState.inputText) },
-                isTranslating = uiState.isTranslating,
-                isModelReady = uiState.isModelReady,
-                isListening = isListening,
-                onStartSpeechToText = viewModel::startSpeechToText,
-                onStopSpeechToText = viewModel::stopSpeechToText
-            )
-        }
+        bottomBar = {}
     ) { paddingValues ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .imePadding()
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .pointerInput(Unit) {
+                    detectTapGestures(onTap = { focusManager.clearFocus() })
+                }
         ) {
             if (messages.isEmpty()) {
                 // 빈 채팅 상태
@@ -325,8 +381,15 @@ fun ChatScreen(
                 // 메시지 목록
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        ,
+                    contentPadding = PaddingValues(
+                        start = 16.dp,
+                        end = 16.dp,
+                        top = 16.dp,
+                        bottom = with(density) { inputBarHeightPx.toDp() }
+                    ),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(messages, key = { it.id }) { message ->
@@ -341,6 +404,14 @@ fun ChatScreen(
                             isTtsSupported = { language ->
                                 viewModel.isTtsLanguageSupported(language)
                             }
+                        )
+                    }
+                    item {
+                        Spacer(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(1.dp)
+                                .bringIntoViewRequester(bottomAnchor)
                         )
                     }
                 }
@@ -363,6 +434,30 @@ fun ChatScreen(
                 ) {
                     Text(error)
                 }
+            }
+            // 입력 바를 콘텐츠 위에 오버레이
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .onGloballyPositioned { coordinates ->
+                        inputBarHeightPx = coordinates.size.height
+                    }
+            ) {
+                ChatInputBar(
+                    inputText = uiState.inputText,
+                    onInputChange = viewModel::updateInputText,
+                    onSendMessage = {
+                        pendingScrollAfterSend = true
+                        viewModel.sendMessage(uiState.inputText)
+                    },
+                    isTranslating = uiState.isTranslating,
+                    isModelReady = uiState.isModelReady,
+                    isListening = isListening,
+                    onStartSpeechToText = viewModel::startSpeechToText,
+                    onStopSpeechToText = viewModel::stopSpeechToText,
+                    onInputFocusChanged = { focused -> isInputFocused = focused }
+                )
             }
         }
     }
@@ -539,9 +634,11 @@ private fun ChatInputBar(
     isModelReady: Boolean,
     isListening: Boolean,
     onStartSpeechToText: () -> Unit,
-    onStopSpeechToText: () -> Unit
+    onStopSpeechToText: () -> Unit,
+    onInputFocusChanged: (Boolean) -> Unit = {}
 ) {
     val context = LocalContext.current
+    val focusRequester = remember { FocusRequester() }
     
     // 🎯 마이크 버튼 디바운싱을 위한 상태
     var lastClickTime by remember { mutableStateOf(0L) }
@@ -588,23 +685,35 @@ private fun ChatInputBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 36.dp),
+                .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             OutlinedTextField(
                 value = inputText,
                 onValueChange = onInputChange,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .focusRequester(focusRequester)
+                    .onFocusChanged { onInputFocusChanged(it.isFocused) },
                 placeholder = { Text("번역할 메시지를 입력하세요") },
                 maxLines = 4,
                 shape = RoundedCornerShape(20.dp),
-                enabled = !isTranslating && isModelReady,
+                enabled = isModelReady,
                 colors = OutlinedTextFieldDefaults.colors(
                     unfocusedBorderColor = Gray300,
                     focusedBorderColor = InputMessage,
                     unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                     focusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                ),
+                keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(
+                    onSend = {
+                        if (inputText.isNotBlank() && isModelReady && !isTranslating) {
+                            onSendMessage()
+                            focusRequester.requestFocus()
+                        }
+                    }
                 ),
                 trailingIcon = {
                     // 고정된 크기의 컨테이너로 아이콘 위치 일관성 보장
@@ -671,7 +780,12 @@ private fun ChatInputBar(
             
             val isEnabled = inputText.isNotBlank() && isModelReady && !isTranslating
             FloatingActionButton(
-                onClick = { if (isEnabled) onSendMessage() },
+                onClick = {
+                    if (isEnabled) {
+                        onSendMessage()
+                        focusRequester.requestFocus()
+                    }
+                },
                 modifier = Modifier.size(48.dp),
                 containerColor = if (isEnabled) InputMessage else Gray400,
                 contentColor = Color.White,
@@ -778,6 +892,7 @@ private fun SearchTopAppBar(
     }
     
     TopAppBar(
+        modifier = Modifier.statusBarsPadding(),
         title = {
             OutlinedTextField(
                 value = searchQuery,

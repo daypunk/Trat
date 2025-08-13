@@ -32,8 +32,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         
-        // 시스템 UI 완전 숨김 (전체 화면 몰입 모드)
-        hideSystemUI()
+        // 시스템 바 설정 (네비게이션 바는 표시하여 IME와의 인셋 충돌 방지)
+        configureSystemBars()
         
         // 앱 초기화 시뮬레이션 (실제로는 데이터베이스, 설정 로딩 등)
         lifecycleScope.launch {
@@ -60,19 +60,17 @@ class MainActivity : ComponentActivity() {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) {
-            hideSystemUI() // 포커스 복귀 시 시스템 UI 다시 숨김
+            configureSystemBars() // 포커스 복귀 시 시스템 바 설정 유지
         }
     }
     
     /**
-     * 하단 내비게이션 바만 숨김 (상단 상태바는 유지)
-     * 스와이프 표시 없음
+     * 시스템 바 구성: 네비게이션 바를 표시해 IME와 정상적으로 붙도록 함
      */
-    private fun hideSystemUI() {
+    private fun configureSystemBars() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         WindowInsetsControllerCompat(window, window.decorView).let { controller ->
-            controller.hide(WindowInsetsCompat.Type.navigationBars()) // 하단만 숨김
-            // 스와이프 표시 비활성화 (systemBarsBehavior 설정 제거)
+            controller.show(WindowInsetsCompat.Type.navigationBars())
         }
     }
 }

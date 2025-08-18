@@ -78,7 +78,7 @@ dependencies {
     implementation(libs.androidx.material3)
     
     // ML Kit Translation
-    implementation("com.google.mlkit:translate:17.0.2")
+    implementation("com.google.mlkit:translate:17.0.3")
     
     // Room Database
     implementation("androidx.room:room-runtime:2.6.1")

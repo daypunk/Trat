@@ -26,10 +26,11 @@ import java.util.*
 @Composable
 fun MessageBubble(
     message: Message,
-    isHighlighted: Boolean = false,
+    @Suppress("UNUSED_PARAMETER") isHighlighted: Boolean = false,
     searchQuery: String = "",
     onSpeakMessage: ((String, SupportedLanguage) -> Unit)? = null,
-    isTtsSupported: ((SupportedLanguage) -> Boolean)? = null
+    isTtsSupported: ((SupportedLanguage) -> Boolean)? = null,
+    onRequestLanguagePack: ((SupportedLanguage) -> Unit)? = null
 ) {
 
     Column(
@@ -126,29 +127,39 @@ fun MessageBubble(
                     }
                 }
                 
-                // TTS 스피커 아이콘 (지원되는 언어에서만 표시)
+                // TTS 스피커 아이콘 (항상 표시하되, 지원 여부에 따라 동작 분기)
                 if (onSpeakMessage != null && isTtsSupported != null) {
                     // TTS로 재생할 텍스트의 언어 감지
                     val textToSpeakLanguage = LanguageDetector.detectLanguage(message.translatedText)
+                    val isLanguageSupported = isTtsSupported(textToSpeakLanguage)
                     
-                    // 일본어나 중국어가 아니고, TTS가 지원되는 언어인 경우에만 아이콘 표시
-                    if (textToSpeakLanguage != SupportedLanguage.JAPANESE && 
-                        textToSpeakLanguage != SupportedLanguage.CHINESE &&
-                        isTtsSupported(textToSpeakLanguage)) {
-                        IconButton(
-                            onClick = { 
-                                val textToSpeak = message.translatedText
+                    IconButton(
+                        onClick = { 
+                            val textToSpeak = message.translatedText
+                            if (isLanguageSupported) {
+                                // 언어가 지원되면 바로 TTS 실행
                                 onSpeakMessage(textToSpeak, textToSpeakLanguage)
+                            } else {
+                                // 언어가 지원되지 않으면 언어팩 다운로드 안내
+                                onRequestLanguagePack?.invoke(textToSpeakLanguage)
+                            }
+                        },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_tts),
+                            contentDescription = if (isLanguageSupported) {
+                                "음성으로 듣기"
+                            } else {
+                                "${textToSpeakLanguage.displayName} 언어팩 다운로드"
                             },
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_tts),
-                                contentDescription = "음성으로 듣기",
-                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
+                            tint = if (isLanguageSupported) {
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                            } else {
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                            },
+                            modifier = Modifier.size(22.dp)
+                        )
                     }
                 }
             }
@@ -190,7 +201,6 @@ private fun formatTimestamp(timestamp: Long): String {
 
 @Composable
 private fun buildHighlightedText(text: String, searchQuery: String) = buildAnnotatedString {
-    val highlightColor = Gray800
     var startIndex = 0
     
     while (startIndex < text.length) {

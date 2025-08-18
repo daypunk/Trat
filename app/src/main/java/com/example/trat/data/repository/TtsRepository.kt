@@ -1,6 +1,7 @@
 package com.example.trat.data.repository
 
 import android.content.Context
+import android.content.Intent
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
@@ -27,11 +28,7 @@ class TtsRepository @Inject constructor(
     private val _isSpeaking = MutableStateFlow(false)
     override val isSpeaking: StateFlow<Boolean> = _isSpeaking.asStateFlow()
     
-    // 지원되는 언어 목록 (삼성 TTS 기준)
-    private val supportedLanguages = setOf(
-        SupportedLanguage.KOREAN,
-        SupportedLanguage.ENGLISH
-    )
+
     
     override fun initialize() {
         if (textToSpeech != null) return
@@ -40,9 +37,21 @@ class TtsRepository @Inject constructor(
             _isInitialized.value = (status == TextToSpeech.SUCCESS)
             if (status == TextToSpeech.SUCCESS) {
                 setupUtteranceListener()
+                logTtsEngineInfo()
                 Log.d("TTS", "TTS 초기화 성공")
             } else {
-                Log.e("TTS", "TTS 초기화 실패")
+                Log.e("TTS", "TTS 초기화 실패: status=$status")
+            }
+        }
+    }
+    
+    private fun logTtsEngineInfo() {
+        textToSpeech?.let { tts ->
+            try {
+                val defaultEngine = tts.defaultEngine
+                Log.d("TTS", "사용 중인 TTS 엔진: $defaultEngine")
+            } catch (e: Exception) {
+                Log.e("TTS", "TTS 엔진 정보 확인 중 오류", e)
             }
         }
     }
@@ -57,6 +66,7 @@ class TtsRepository @Inject constructor(
                 _isSpeaking.value = false
             }
             
+            @Suppress("OVERRIDE_DEPRECATION")
             override fun onError(utteranceId: String?) {
                 _isSpeaking.value = false
                 Log.e("TTS", "TTS 오류 발생")
@@ -65,32 +75,56 @@ class TtsRepository @Inject constructor(
     }
     
     override fun isLanguageSupported(language: SupportedLanguage): Boolean {
-        return supportedLanguages.contains(language)
+        // TTS 엔진이 초기화되지 않았으면 false 반환
+        val tts = textToSpeech ?: return false
+        if (!_isInitialized.value) return false
+        
+        val locale = when (language.code) {
+            "ko" -> Locale.KOREA
+            "en" -> Locale.US
+            "ja" -> Locale.JAPAN
+            "zh" -> Locale.CHINA
+            else -> Locale.US
+        }
+        
+        return try {
+            // 단순하게 isLanguageAvailable만 사용
+            val result = tts.isLanguageAvailable(locale)
+            when (result) {
+                TextToSpeech.LANG_AVAILABLE,
+                TextToSpeech.LANG_COUNTRY_AVAILABLE,
+                TextToSpeech.LANG_COUNTRY_VAR_AVAILABLE -> true
+                else -> false
+            }
+        } catch (e: Exception) {
+            Log.e("TTS", "언어 지원 확인 중 오류: ${language.displayName}", e)
+            false
+        }
     }
     
     override fun speak(text: String, language: SupportedLanguage) {
-        // 지원되지 않는 언어 체크
-        if (!isLanguageSupported(language)) {
-            Log.w("TTS", "${language.displayName} 언어는 TTS에서 지원되지 않습니다")
-            return
+        val tts = textToSpeech ?: return
+        if (!_isInitialized.value) return
+        
+        val locale = when (language.code) {
+            "ko" -> Locale.KOREA
+            "en" -> Locale.US
+            "ja" -> Locale.JAPAN
+            "zh" -> Locale.CHINA
+            else -> Locale.US
         }
         
-        textToSpeech?.let { tts ->
-            val locale = when (language.code) {
-                "ko" -> Locale.KOREA
-                "en" -> Locale.US
-                "ja" -> Locale.JAPAN
-                "zh" -> Locale.CHINA
-                else -> Locale.US
-            }
-            
+        try {
             val result = tts.setLanguage(locale)
-            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                Log.w("TTS", "${language.displayName} 언어가 지원되지 않습니다")
-                return
+            if (result == TextToSpeech.LANG_AVAILABLE ||
+                result == TextToSpeech.LANG_COUNTRY_AVAILABLE ||
+                result == TextToSpeech.LANG_COUNTRY_VAR_AVAILABLE) {
+                tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "tts_${System.currentTimeMillis()}")
+            } else {
+                Log.w("TTS", "${language.displayName} 언어 설정 실패: $result")
             }
-            
-            tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "tts_${System.currentTimeMillis()}")
+        } catch (e: Exception) {
+            Log.e("TTS", "TTS 재생 오류: ${language.displayName}", e)
         }
     }
     
@@ -105,5 +139,25 @@ class TtsRepository @Inject constructor(
         textToSpeech = null
         _isInitialized.value = false
         _isSpeaking.value = false
+    }
+    
+    // 언어팩 다운로드 인텐트 생성
+    override fun createLanguagePackDownloadIntent(): Intent {
+        return Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA)
+    }
+    
+    // 언어팩 설치 후 TTS 새로고침
+    override fun refreshLanguageSupport() {
+        // 캐시 없이 단순하게 TTS만 재초기화
+        if (textToSpeech == null || !_isInitialized.value) {
+            initialize()
+        }
+    }
+    
+    // TTS 재초기화 메서드 추가
+    override fun reinitialize() {
+        Log.d("TTS", "TTS 재초기화 시작")
+        shutdown()
+        initialize()
     }
 } 

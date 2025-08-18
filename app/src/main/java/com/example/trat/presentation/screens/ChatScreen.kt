@@ -9,7 +9,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.shadow
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Send
+import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Close
@@ -31,6 +31,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.trat.data.entities.Chat
 import com.example.trat.data.entities.Message
 import com.example.trat.presentation.components.MessageBubble
+import com.example.trat.presentation.components.LanguagePackDownloadDialog
 import com.example.trat.presentation.viewmodels.ChatViewModel
 import com.example.trat.presentation.viewmodels.MainViewModel
 import kotlinx.coroutines.launch
@@ -404,6 +405,9 @@ fun ChatScreen(
                             },
                             isTtsSupported = { language ->
                                 viewModel.isTtsLanguageSupported(language)
+                            },
+                            onRequestLanguagePack = { language ->
+                                viewModel.requestLanguagePack(language)
                             }
                         )
                     }
@@ -563,6 +567,41 @@ fun ChatScreen(
                 }
             )
         }
+        
+            // 언어팩 다운로드 다이얼로그
+    uiState.languagePackRequestLanguage?.let { language ->
+        if (uiState.showLanguagePackDialog) {
+            LanguagePackDownloadDialog(
+                language = language,
+                onDownloadClick = {
+                    // 언어팩 다운로드 설정으로 이동
+                    val intent = viewModel.createLanguagePackDownloadIntent()
+                    context.startActivity(intent)
+                    viewModel.dismissLanguagePackDialog()
+                },
+                onDismiss = {
+                    viewModel.dismissLanguagePackDialog()
+                }
+            )
+        }
+    }
+    
+    // 앱이 포그라운드로 돌아올 때 TTS 상태 새로고침
+    DisposableEffect(Unit) {
+        val activity = context as? androidx.activity.ComponentActivity
+        val lifecycleObserver = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                // 앱이 포그라운드로 돌아올 때 TTS 언어 지원 상태 새로고침
+                viewModel.refreshTtsLanguageSupport()
+            }
+        }
+        
+        activity?.lifecycle?.addObserver(lifecycleObserver)
+        
+        onDispose {
+            activity?.lifecycle?.removeObserver(lifecycleObserver)
+        }
+    }
 
     }
 }
@@ -579,7 +618,7 @@ private fun getLanguageFlag(languageCode: String): String {
 
 @Composable
 private fun EmptyChatState(
-    currentChat: Chat?,
+    @Suppress("UNUSED_PARAMETER") currentChat: Chat?,
     isModelReady: Boolean
 ) {
     // Lottie 애니메이션 설정
@@ -805,7 +844,7 @@ private fun ChatInputBar(
                     )
                 } else {
                     Icon(
-                        Icons.Rounded.Send, 
+                        Icons.AutoMirrored.Rounded.Send, 
                         contentDescription = "전송",
                         modifier = Modifier.size(20.dp)
                     )
@@ -1017,7 +1056,7 @@ private fun ChatMenuDrawer(
                 
                 // 마지막 아이템이 아니면 구분선 추가
                 if (index < chats.size - 1) {
-                    Divider(
+                    HorizontalDivider(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                         color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
                         thickness = 0.5.dp

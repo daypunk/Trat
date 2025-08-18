@@ -1,5 +1,6 @@
 package com.example.trat.domain.usecase
 
+import android.content.Intent
 import com.example.trat.data.models.SupportedLanguage
 import com.example.trat.domain.repository.TtsRepositoryInterface
 import kotlinx.coroutines.flow.StateFlow
@@ -31,5 +32,17 @@ class TtsUseCase @Inject constructor(
     
     fun shutdown() {
         ttsRepository.shutdown()
+    }
+    
+    fun createLanguagePackDownloadIntent(): Intent {
+        return ttsRepository.createLanguagePackDownloadIntent()
+    }
+    
+    fun refreshLanguageSupport() {
+        ttsRepository.refreshLanguageSupport()
+    }
+    
+    fun reinitialize() {
+        ttsRepository.reinitialize()
     }
 } 

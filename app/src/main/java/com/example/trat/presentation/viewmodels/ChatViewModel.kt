@@ -1,5 +1,6 @@
 package com.example.trat.presentation.viewmodels
 
+import android.content.Intent
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -97,6 +98,51 @@ class ChatViewModel @Inject constructor(
      */
     fun stopTts() {
         ttsUseCase.stop()
+    }
+    
+    /**
+     * 언어팩 다운로드 요청
+     */
+    fun requestLanguagePack(language: SupportedLanguage) {
+        updateUiState { 
+            copy(
+                showLanguagePackDialog = true,
+                languagePackRequestLanguage = language
+            )
+        }
+    }
+    
+    /**
+     * 언어팩 다운로드 다이얼로그 닫기
+     */
+    fun dismissLanguagePackDialog() {
+        updateUiState { 
+            copy(
+                showLanguagePackDialog = false,
+                languagePackRequestLanguage = null
+            )
+        }
+    }
+    
+    /**
+     * 언어팩 다운로드 인텐트 생성
+     */
+    fun createLanguagePackDownloadIntent(): Intent {
+        return ttsUseCase.createLanguagePackDownloadIntent()
+    }
+    
+    /**
+     * 언어팩 설치 후 TTS 지원 상태 새로고침
+     */
+    fun refreshTtsLanguageSupport() {
+        ttsUseCase.refreshLanguageSupport()
+    }
+    
+    /**
+     * TTS 재초기화 (설정 변경 후 호출)
+     */
+    fun reinitializeTts() {
+        ttsUseCase.reinitialize()
     }
     
     /**
@@ -236,6 +282,8 @@ data class ChatUiState(
     val isTranslating: Boolean = false,
     val isModelReady: Boolean = true, // 앱 시작 시 모든 모델이 다운로드되므로 기본값을 true로 설정
     val inputText: String = "",
+    val showLanguagePackDialog: Boolean = false,
+    val languagePackRequestLanguage: SupportedLanguage? = null,
     override val errorMessage: String? = null
 ) : BaseUiState {
     override fun clearErrorMessage(): ChatUiState = copy(errorMessage = null)

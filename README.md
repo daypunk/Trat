@@ -1,5 +1,8 @@
 # Trat
-<img width="533" height="312" alt="Image" src="https://github.com/user-attachments/assets/a24d137e-ec8b-44f5-8ecc-aacf567e04e5" />
+
+<p align="center">
+  <img width="533" height="312" alt="Image" src="https://github.com/user-attachments/assets/a24d137e-ec8b-44f5-8ecc-aacf567e04e5" />
+</p>
 
 ## 개요
 
@@ -13,7 +16,7 @@
 
 채팅방은 로컬 DB에 저장되며, 검색 기능도 제공합니다!
 
-무엇보다, **트랫**은 가볍고 빠르게 동작합니다.
+무엇보다, **트랫**은 가볍고 빠르게 동작합니다 😜
 
 ## 핵심 기능
 
@@ -27,7 +30,7 @@
 - **성능 최적화**: 번역 캐싱, DB 인덱싱, Flow 최적화
 
 
-## Clean Architecture + MVVM
+## MVVM
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
@@ -111,7 +114,7 @@ di/
 
 **Hilt**를 사용한 의존성 주입으로 객체 생성과 생명주기를 자동 관리합니다.
 
-## 아키텍처의 장점
+## 신경쓴 부분
 
 ### 1. 관심사의 분리 (Separation of Concerns)
 - **UI 로직**: Presentation Layer에서만 처리
@@ -237,20 +240,18 @@ class ChatViewModel : BaseViewModel() {
 ## 학습
 
 ### 1. 아키텍처 패턴
-- Clean Architecture의 실제 적용법
-- MVVM 패턴의 올바른 구현
+- MVVM 패턴 구현
 - 의존성 주입의 활용
 
 ### 2. Jetpack Components
-- Compose를 활용한 선언형 UI
-- Room을 통한 로컬 데이터베이스 관리
+- Compose 선언형 UI
+- Room을 통한 로컬 DB 관리
 - Navigation Component로 화면 전환
 - ViewModel과 StateFlow로 상태 관리
 
-### 3. 현대적 기법
+### 3. 기법
 - Coroutines와 Flow를 통한 비동기 처리
-- 함수형 프로그래밍 원칙 적용
-- 반응형 프로그래밍 구현
+- 함수형 프로그래밍 원칙
 
 ### 4. 성능 최적화
 - 캐싱 전략 수립

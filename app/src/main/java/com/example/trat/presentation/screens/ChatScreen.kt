@@ -34,6 +34,7 @@ import com.example.trat.presentation.components.MessageBubble
 import com.example.trat.presentation.components.LanguagePackDownloadDialog
 import com.example.trat.presentation.viewmodels.ChatViewModel
 import com.example.trat.presentation.viewmodels.MainViewModel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import android.widget.Toast
 import androidx.compose.ui.graphics.Color
@@ -156,10 +157,15 @@ fun ChatScreen(
     // IME(키보드) 가시성 변화 시 하단으로 스크롤
     val isImeVisible = WindowInsets.ime.getBottom(androidx.compose.ui.platform.LocalDensity.current) > 0
     LaunchedEffect(isImeVisible) {
-        if (isImeVisible && messages.isNotEmpty()) {
+        if (isImeVisible) {
             scope.launch {
-                kotlinx.coroutines.delay(100)
-                listState.animateScrollToItem(messages.size - 1)
+                snapshotFlow { listState.layoutInfo.totalItemsCount }
+                    .first()
+                    .let {
+                        if (it > 0) {
+                            listState.animateScrollToItem(it - 1)
+                        }
+                    }
             }
         }
     }
@@ -1152,6 +1158,7 @@ private fun ChatItemInMenu(
         }
     }
 }
+
 
 
 

@@ -98,42 +98,39 @@ fun ChatScreen(
     val currentChat by viewModel.currentChat.collectAsStateWithLifecycle()
     val messages by viewModel.messages.collectAsStateWithLifecycle()
     val chats by mainViewModel.chats.collectAsStateWithLifecycle()
-    
+
     // STT 상태
     val isListening by viewModel.isListening.collectAsStateWithLifecycle()
     val recognizedText by viewModel.recognizedText.collectAsStateWithLifecycle()
     val sttError by viewModel.sttError.collectAsStateWithLifecycle()
-    
+
     val listState = rememberLazyListState()
-    val bottomAnchor = remember { BringIntoViewRequester() }
     val scope = rememberCoroutineScope()
-    
+
     // 사이드 드로어 상태
     var showRightDrawer by remember { mutableStateOf(false) }
-    
+
     // 검색 관련 상태
     var isSearching by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var searchResults by remember { mutableStateOf(emptyList<Int>()) }
     var currentSearchIndex by remember { mutableStateOf(0) }
-    
+
     // 메뉴 관련 상태
     var isEditMode by remember { mutableStateOf(false) }
-    
+
     // 언어 재설정 다이얼로그 상태
     var showLanguageSettingsDialog by remember { mutableStateOf(false) }
-    
+
     // 새 채팅 생성 다이얼로그 상태
     var showNewChatDialog by remember { mutableStateOf(false) }
-    
+
     // 드로워 상태 추적 (이전 상태를 기억하기 위함)
     var previousDrawerState by remember { mutableStateOf(false) }
-    
+
     val context = LocalContext.current
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
-    val density = androidx.compose.ui.platform.LocalDensity.current
-    var inputBarHeightPx by remember { mutableStateOf(0) }
-    
+
     // 모델 다운로드 상태 확인 및 마지막 채팅 저장
     LaunchedEffect(chatId) {
         if (chatId.isNotEmpty()) {
@@ -143,7 +140,7 @@ fun ChatScreen(
             sharedPrefs.edit().putString("last_chat_id", chatId).apply()
         }
     }
-    
+
     // 하단 여부 및 전송 후 스크롤 플래그
     var pendingScrollAfterSend by remember { mutableStateOf(false) }
     val isAtBottom by remember(messages.size) {
@@ -155,34 +152,28 @@ fun ChatScreen(
             lastVisible >= total - 2
         }
     }
-    // 앱 최초 오픈(해당 chatId 최초 진입) 시, 메시지와 입력바 측정 후 1회 하단 스크롤
-    var didInitialScroll by remember(chatId) { mutableStateOf(false) }
-    LaunchedEffect(messages.size, inputBarHeightPx) {
-        if (!didInitialScroll && messages.isNotEmpty()) {
-            listState.scrollToItem(messages.size - 1)
-            didInitialScroll = true
+
+    // IME(키보드) 가시성 변화 시 하단으로 스크롤
+    val isImeVisible = WindowInsets.ime.getBottom(androidx.compose.ui.platform.LocalDensity.current) > 0
+    LaunchedEffect(isImeVisible) {
+        if (isImeVisible && messages.isNotEmpty()) {
+            scope.launch {
+                kotlinx.coroutines.delay(100)
+                listState.animateScrollToItem(messages.size - 1)
+            }
         }
     }
-    // IME(키보드) 가시성 변화 시 최초 표시 타이밍에 하단으로 스크롤
-    val imeVisible = androidx.compose.foundation.layout.WindowInsets.ime.getBottom(density) > 0
-    LaunchedEffect(imeVisible, inputBarHeightPx) {
-        if (imeVisible && messages.isNotEmpty() && isAtBottom && !isSearching) {
-            // 레이아웃 재계산 이후 약간의 여유를 두고 2단계로 하단 정렬 시도
-            kotlinx.coroutines.delay(120)
-            listState.animateScrollToItem(messages.size - 1)
-            // 남은 미세 오프셋은 직접 하단 앵커를 화면에 보이도록 요청
-            kotlinx.coroutines.delay(60)
-            bottomAnchor.bringIntoView()
-        }
-    }
+
     // 새 메시지 추가 시: 사용자가 하단이거나 전송 직후면 즉시 하단으로
-    LaunchedEffect(messages.size, isAtBottom, pendingScrollAfterSend) {
-        if (messages.isNotEmpty() && !isSearching && (isAtBottom || pendingScrollAfterSend)) {
-            listState.scrollToItem(messages.size - 1)
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty() && (isAtBottom || pendingScrollAfterSend)) {
+            scope.launch {
+                listState.animateScrollToItem(messages.size - 1)
+            }
             pendingScrollAfterSend = false
         }
     }
-    
+
     // 에러 메시지 토스트 표시
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let { message ->
@@ -190,7 +181,7 @@ fun ChatScreen(
             viewModel.clearError() // 토스트 표시 후 에러 메시지 클리어
         }
     }
-    
+
     // STT 에러 메시지 토스트 표시
     LaunchedEffect(sttError) {
         sttError?.let { error ->
@@ -198,7 +189,7 @@ fun ChatScreen(
             viewModel.clearSttError()
         }
     }
-    
+
     // 모든 채팅 삭제 후 드로워 닫힘 감지
     LaunchedEffect(showRightDrawer, chats.size) {
         // 드로워가 열려있다가 닫혔을 때 (true → false)
@@ -211,14 +202,14 @@ fun ChatScreen(
         // 현재 드로워 상태를 이전 상태로 저장
         previousDrawerState = showRightDrawer
     }
-    
+
     // 음성 인식 결과 처리
     LaunchedEffect(recognizedText) {
         if (recognizedText.isNotEmpty()) {
             viewModel.appendRecognizedText(recognizedText)
         }
     }
-    
+
     // 검색 실행
     LaunchedEffect(searchQuery) {
         if (searchQuery.isNotBlank()) {
@@ -232,7 +223,7 @@ fun ChatScreen(
             }
             searchResults = results
             currentSearchIndex = if (results.isNotEmpty()) 0 else -1
-            
+
             if (results.isNotEmpty()) {
                 scope.launch {
                     listState.animateScrollToItem(results[0])
@@ -243,212 +234,117 @@ fun ChatScreen(
             currentSearchIndex = -1
         }
     }
-    
-    // 입력창 포커스 기반 간단한 자동 스크롤
-    var isInputFocused by remember { mutableStateOf(false) }
-    LaunchedEffect(isInputFocused) {
-        if (isInputFocused && messages.isNotEmpty() && !isSearching) {
-            listState.scrollToItem(messages.size - 1)
-        }
-    }
 
     // 메인 컨텐츠
     Box(modifier = Modifier.fillMaxSize()) {
-    Scaffold(
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = {
-            if (isSearching) {
-                SearchTopAppBar(
-                    searchQuery = searchQuery,
-                    onSearchQueryChange = { searchQuery = it },
-                    onSearchClose = { 
-                        isSearching = false
-                        searchQuery = ""
-                    },
-                    searchResults = searchResults,
-                    currentSearchIndex = currentSearchIndex,
-                    onNavigateToNext = {
-                        if (searchResults.isNotEmpty()) {
-                            currentSearchIndex = (currentSearchIndex + 1) % searchResults.size
-                            scope.launch {
-                                listState.animateScrollToItem(searchResults[currentSearchIndex])
-                            }
-                        }
-                    },
-                    onNavigateToPrevious = {
-                        if (searchResults.isNotEmpty()) {
-                            currentSearchIndex = if (currentSearchIndex == 0) {
-                                searchResults.size - 1
-                            } else {
-                                currentSearchIndex - 1
-                            }
-                            scope.launch {
-                                listState.animateScrollToItem(searchResults[currentSearchIndex])
-                            }
-                        }
-                    }
-                )
-            } else {
-                Surface(
-                    shadowElevation = 4.dp,
-                    color = MaterialTheme.colorScheme.surface
-                ) {
-                TopAppBar(
-                    modifier = Modifier
-                        .statusBarsPadding()
-                        .pointerInput(Unit) {
-                            detectTapGestures(onTap = { focusManager.clearFocus() })
+        Scaffold(
+            modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing),
+            topBar = {
+                if (isSearching) {
+                    SearchTopAppBar(
+                        searchQuery = searchQuery,
+                        onSearchQueryChange = { searchQuery = it },
+                        onSearchClose = {
+                            isSearching = false
+                            searchQuery = ""
                         },
-                    title = {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                // 언어 뱃지
-                                currentChat?.let { chat ->
-                                    Card(
-                                        modifier = Modifier.clickable { showLanguageSettingsDialog = true },
-                                        colors = CardDefaults.cardColors(
-                                            containerColor = InputMessage.copy(alpha = 0.1f)
-                                        ),
-                                        shape = RoundedCornerShape(16.dp),
-                                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        searchResults = searchResults,
+                        currentSearchIndex = currentSearchIndex,
+                        onNavigateToNext = {
+                            if (searchResults.isNotEmpty()) {
+                                currentSearchIndex = (currentSearchIndex + 1) % searchResults.size
+                                scope.launch {
+                                    listState.animateScrollToItem(searchResults[currentSearchIndex])
+                                }
+                            }
+                        },
+                        onNavigateToPrevious = {
+                            if (searchResults.isNotEmpty()) {
+                                currentSearchIndex = if (currentSearchIndex == 0) {
+                                    searchResults.size - 1
+                                } else {
+                                    currentSearchIndex - 1
+                                }
+                                scope.launch {
+                                    listState.animateScrollToItem(searchResults[currentSearchIndex])
+                                }
+                            }
+                        }
+                    )
+                } else {
+                    Surface(
+                        shadowElevation = 4.dp,
+                        color = MaterialTheme.colorScheme.surface
+                    ) {
+                        TopAppBar(
+                            modifier = Modifier
+                                .statusBarsPadding()
+                                .pointerInput(Unit) {
+                                    detectTapGestures(onTap = { focusManager.clearFocus() })
+                                },
+                            title = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    // 언어 뱃지
+                                    currentChat?.let { chat ->
+                                        Card(
+                                            modifier = Modifier.clickable { showLanguageSettingsDialog = true },
+                                            colors = CardDefaults.cardColors(
+                                                containerColor = InputMessage.copy(alpha = 0.1f)
+                                            ),
+                                            shape = RoundedCornerShape(16.dp),
+                                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                                         ) {
-                                            // 메인화면 헤더 뱃지 부분
-                                            Text(
-                                                text = getLanguageFlag(chat.nativeLanguage.code),
-                                                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp)
-                                            )
-                                            Icon(
-                                                imageVector = Icons.Rounded.Refresh,
-                                                contentDescription = "양방향 번역",
-                                                tint = InputMessage,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                            Text(
-                                                text = getLanguageFlag(chat.translateLanguage.code),
-                                                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp)
-                                            )
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                // 메인화면 헤더 뱃지 부분
+                                                Text(
+                                                    text = getLanguageFlag(chat.nativeLanguage.code),
+                                                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp)
+                                                )
+                                                Icon(
+                                                    imageVector = Icons.Rounded.Refresh,
+                                                    contentDescription = "양방향 번역",
+                                                    tint = InputMessage,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                                Text(
+                                                    text = getLanguageFlag(chat.translateLanguage.code),
+                                                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp)
+                                                )
+                                            }
                                         }
                                     }
+
+                                    // 간단한 채팅방 제목만 표시
+                                    Text(
+                                        text = currentChat?.title ?: "채팅",
+                                        style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp),
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
+                                    )
                                 }
-                                
-                                // 간단한 채팅방 제목만 표시
-                                Text(
-                                    text = currentChat?.title ?: "채팅",
-                                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp),
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f)
-                                )
-                        }
-                    },
-                    actions = {
-                            IconButton(onClick = { isSearching = true }) {
-                                Icon(Icons.Rounded.Search, contentDescription = "검색")
-                            }
-                                                          IconButton(onClick = { showRightDrawer = true }) {
-                                Icon(Icons.Rounded.Menu, contentDescription = "메뉴")
-                        }
-                    }
-                )
-                }
-            }
-        },
-        bottomBar = {}
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .imePadding()
-                .windowInsetsPadding(WindowInsets.navigationBars)
-                .pointerInput(Unit) {
-                    detectTapGestures(onTap = { focusManager.clearFocus() })
-                }
-        ) {
-            if (messages.isEmpty()) {
-                // 빈 채팅 상태
-                EmptyChatState(
-                    currentChat = currentChat,
-                    isModelReady = uiState.isModelReady
-                )
-            } else {
-                // 메시지 목록
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        ,
-                    contentPadding = PaddingValues(
-                        start = 16.dp,
-                        end = 16.dp,
-                        top = 16.dp,
-                        bottom = with(density) { inputBarHeightPx.toDp() }
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(messages, key = { it.id }) { message ->
-                        MessageBubble(
-                            message = message,
-                            isHighlighted = searchResults.isNotEmpty() && 
-                                searchResults.getOrNull(currentSearchIndex) == messages.indexOf(message),
-                            searchQuery = if (isSearching) searchQuery else "",
-                            onSpeakMessage = { text, language ->
-                                viewModel.speakMessage(text, language)
                             },
-                            isTtsSupported = { language ->
-                                viewModel.isTtsLanguageSupported(language)
-                            },
-                            onRequestLanguagePack = { language ->
-                                viewModel.requestLanguagePack(language)
+                            actions = {
+                                IconButton(onClick = { isSearching = true }) {
+                                    Icon(Icons.Rounded.Search, contentDescription = "검색")
+                                }
+                                IconButton(onClick = { showRightDrawer = true }) {
+                                    Icon(Icons.Rounded.Menu, contentDescription = "메뉴")
+                                }
                             }
                         )
                     }
-                    item {
-                        Spacer(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(1.dp)
-                                .bringIntoViewRequester(bottomAnchor)
-                        )
-                    }
                 }
-            }
-            
-            // 에러 메시지 표시
-            uiState.errorMessage?.let { error ->
-                LaunchedEffect(error) {
-                    kotlinx.coroutines.delay(3000)
-                    viewModel.clearError()
-                }
-                
-                Snackbar(
-                    modifier = Modifier.align(Alignment.BottomCenter),
-                    action = {
-                        TextButton(onClick = { viewModel.clearError() }) {
-                            Text("확인")
-                        }
-                    }
-                ) {
-                    Text(error)
-                }
-            }
-            // 입력 바를 콘텐츠 위에 오버레이
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .onGloballyPositioned { coordinates ->
-                        inputBarHeightPx = coordinates.size.height
-                    }
-            ) {
+            },
+            bottomBar = {
                 ChatInputBar(
                     inputText = uiState.inputText,
                     onInputChange = viewModel::updateInputText,
@@ -461,12 +357,86 @@ fun ChatScreen(
                     isListening = isListening,
                     onStartSpeechToText = viewModel::startSpeechToText,
                     onStopSpeechToText = viewModel::stopSpeechToText,
-                    onInputFocusChanged = { focused -> isInputFocused = focused }
+                    onInputFocusChanged = { }
                 )
             }
+        ) { paddingValues ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .pointerInput(Unit) {
+                        detectTapGestures(onTap = { focusManager.clearFocus() })
+                    }
+            ) {
+                if (messages.isEmpty()) {
+                    // 빈 채팅 상태
+                    EmptyChatState(
+                        currentChat = currentChat,
+                        isModelReady = uiState.isModelReady
+                    )
+                } else {
+                    // 메시지 목록
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier
+                            .fillMaxSize(),
+                        contentPadding = PaddingValues(
+                            start = 16.dp,
+                            end = 16.dp,
+                            top = 16.dp,
+                            bottom = 16.dp
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(messages, key = { it.id }) { message ->
+                            MessageBubble(
+                                message = message,
+                                isHighlighted = searchResults.isNotEmpty() &&
+                                        searchResults.getOrNull(currentSearchIndex) == messages.indexOf(message),
+                                searchQuery = if (isSearching) searchQuery else "",
+                                onSpeakMessage = { text, language ->
+                                    viewModel.speakMessage(text, language)
+                                },
+                                isTtsSupported = { language ->
+                                    viewModel.isTtsLanguageSupported(language)
+                                },
+                                onRequestLanguagePack = { language ->
+                                    viewModel.requestLanguagePack(language)
+                                }
+                            )
+                        }
+                        item {
+                            Spacer(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(1.dp)
+                            )
+                        }
+                    }
+                }
+
+                // 에러 메시지 표시
+                uiState.errorMessage?.let { error ->
+                    LaunchedEffect(error) {
+                        kotlinx.coroutines.delay(3000)
+                        viewModel.clearError()
+                    }
+
+                    Snackbar(
+                        modifier = Modifier.align(Alignment.BottomCenter),
+                        action = {
+                            TextButton(onClick = { viewModel.clearError() }) {
+                                Text("확인")
+                            }
+                        }
+                    ) {
+                        Text(error)
+                    }
+                }
+            }
         }
-    }
-        
+
         // 드로어가 열려있을 때 배경 오버레이
         if (showRightDrawer) {
             Box(
@@ -476,7 +446,7 @@ fun ChatScreen(
                     .clickable { showRightDrawer = false }
             )
         }
-        
+
         // 오른쪽 사이드 드로어
         AnimatedVisibility(
             visible = showRightDrawer,
@@ -498,29 +468,29 @@ fun ChatScreen(
                 shadowElevation = 8.dp
             ) {
                 ChatMenuDrawer(
-                chats = chats,
-                currentChatId = chatId,
-                isEditMode = isEditMode,
-                onEditModeToggle = { isEditMode = it },
-                onChatClick = { selectedChatId ->
+                    chats = chats,
+                    currentChatId = chatId,
+                    isEditMode = isEditMode,
+                    onEditModeToggle = { isEditMode = it },
+                    onChatClick = { selectedChatId ->
                         showRightDrawer = false
-                    isEditMode = false
-                    if (selectedChatId != chatId) {
+                        isEditMode = false
+                        if (selectedChatId != chatId) {
                             onNavigateToChat(selectedChatId)
-                    }
-                },
-                onCreateChatClick = {
+                        }
+                    },
+                    onCreateChatClick = {
                         showRightDrawer = false
-                    isEditMode = false
+                        isEditMode = false
                         showNewChatDialog = true
-                },
-                onDeleteChat = { chatIdToDelete ->
-                    mainViewModel.deleteChat(chatIdToDelete)
+                    },
+                    onDeleteChat = { chatIdToDelete ->
+                        mainViewModel.deleteChat(chatIdToDelete)
                     }
                 )
             }
         }
-        
+
         // 언어 설정 다이얼로그
         if (showLanguageSettingsDialog) {
             LanguageSettingsDialog(
@@ -532,9 +502,9 @@ fun ChatScreen(
                     // 현재 채팅의 타이틀과 언어 설정 업데이트
                     currentChat?.let { chat ->
                         mainViewModel.updateChatTitleAndLanguages(
-                            chatId = chat.id, 
-                            title = title, 
-                            nativeLanguage = nativeLanguage, 
+                            chatId = chat.id,
+                            title = title,
+                            nativeLanguage = nativeLanguage,
                             translateLanguage = translateLanguage
                         ) {
                             // 데이터베이스 업데이트 완료 후 ChatViewModel 새로고침
@@ -544,13 +514,13 @@ fun ChatScreen(
                 }
             )
         }
-        
+
         // 새 채팅 생성 다이얼로그
         if (showNewChatDialog) {
             LanguageSettingsDialog(
                 currentChat = null,
                 isNewChat = true,
-                onDismiss = { 
+                onDismiss = {
                     // 채팅이 없는 경우 앱 종료
                     if (chats.isEmpty()) {
                         (context as? androidx.activity.ComponentActivity)?.finish()
@@ -567,41 +537,41 @@ fun ChatScreen(
                 }
             )
         }
-        
-            // 언어팩 다운로드 다이얼로그
-    uiState.languagePackRequestLanguage?.let { language ->
-        if (uiState.showLanguagePackDialog) {
-            LanguagePackDownloadDialog(
-                language = language,
-                onDownloadClick = {
-                    // 언어팩 다운로드 설정으로 이동
-                    val intent = viewModel.createLanguagePackDownloadIntent()
-                    context.startActivity(intent)
-                    viewModel.dismissLanguagePackDialog()
-                },
-                onDismiss = {
-                    viewModel.dismissLanguagePackDialog()
-                }
-            )
-        }
-    }
-    
-    // 앱이 포그라운드로 돌아올 때 TTS 상태 새로고침
-    DisposableEffect(Unit) {
-        val activity = context as? androidx.activity.ComponentActivity
-        val lifecycleObserver = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
-                // 앱이 포그라운드로 돌아올 때 TTS 언어 지원 상태 새로고침
-                viewModel.refreshTtsLanguageSupport()
+
+        // 언어팩 다운로드 다이얼로그
+        uiState.languagePackRequestLanguage?.let { language ->
+            if (uiState.showLanguagePackDialog) {
+                LanguagePackDownloadDialog(
+                    language = language,
+                    onDownloadClick = {
+                        // 언어팩 다운로드 설정으로 이동
+                        val intent = viewModel.createLanguagePackDownloadIntent()
+                        context.startActivity(intent)
+                        viewModel.dismissLanguagePackDialog()
+                    },
+                    onDismiss = {
+                        viewModel.dismissLanguagePackDialog()
+                    }
+                )
             }
         }
-        
-        activity?.lifecycle?.addObserver(lifecycleObserver)
-        
-        onDispose {
-            activity?.lifecycle?.removeObserver(lifecycleObserver)
+
+        // 앱이 포그라운드로 돌아올 때 TTS 상태 새로고침
+        DisposableEffect(Unit) {
+            val activity = context as? androidx.activity.ComponentActivity
+            val lifecycleObserver = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                    // 앱이 포그라운드로 돌아올 때 TTS 언어 지원 상태 새로고침
+                    viewModel.refreshTtsLanguageSupport()
+                }
+            }
+
+            activity?.lifecycle?.addObserver(lifecycleObserver)
+
+            onDispose {
+                activity?.lifecycle?.removeObserver(lifecycleObserver)
+            }
         }
-    }
 
     }
 }
@@ -627,7 +597,7 @@ private fun EmptyChatState(
         composition = composition,
         iterations = LottieConstants.IterateForever
     )
-    
+
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -645,7 +615,7 @@ private fun EmptyChatState(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                
+
                 else -> {
                     // 로티 애니메이션
                     LottieAnimation(
@@ -679,11 +649,11 @@ private fun ChatInputBar(
 ) {
     val context = LocalContext.current
     val focusRequester = remember { FocusRequester() }
-    
+
     // 🎯 마이크 버튼 디바운싱을 위한 상태
     var lastClickTime by remember { mutableStateOf(0L) }
     val debounceDelay = 300L // 0.3초 디바운싱
-    
+
     // 🎯 권한 요청 런처
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -694,14 +664,14 @@ private fun ChatInputBar(
             Toast.makeText(context, "음성 인식을 위해 마이크 권한이 필요합니다", Toast.LENGTH_SHORT).show()
         }
     }
-    
+
     // 🧹 화면 종료 시 정리
     DisposableEffect(Unit) {
         onDispose {
             if (isListening) onStopSpeechToText()
         }
     }
-    
+
     // 🎯 음성 인식 중일 때만 팝업 표시
     if (isListening) {
         SpeechRecognitionLoadingPopup(
@@ -711,7 +681,7 @@ private fun ChatInputBar(
             }
         )
     }
-    
+
     Surface(
         color = MaterialTheme.colorScheme.surface,
         shadowElevation = 8.dp,
@@ -765,14 +735,14 @@ private fun ChatInputBar(
                             onClick = {
                                 val currentTime = System.currentTimeMillis()
                                 android.util.Log.d("STT_DEBUG", "🎯 마이크 버튼 클릭 시도 - 경과시간: ${currentTime - lastClickTime}ms")
-                                
+
                                 // 🛡️ 디바운싱 체크
                                 if (currentTime - lastClickTime < debounceDelay) {
                                     android.util.Log.d("STT_DEBUG", "⏳ 디바운싱 - 클릭 무시 (${currentTime - lastClickTime}ms < ${debounceDelay}ms)")
                                     return@IconButton
                                 }
                                 lastClickTime = currentTime
-                                
+
                                 android.util.Log.d("STT_DEBUG", "🎯 마이크 버튼 클릭 처리 - isListening: $isListening, isTranslating: $isTranslating, isModelReady: $isModelReady")
                                 if (isListening) {
                                     // 🔴 mic_off 기능: 즉시 중지
@@ -817,7 +787,7 @@ private fun ChatInputBar(
                     }
                 }
             )
-            
+
             val isEnabled = inputText.isNotBlank() && isModelReady && !isTranslating
             FloatingActionButton(
                 onClick = {
@@ -844,7 +814,7 @@ private fun ChatInputBar(
                     )
                 } else {
                     Icon(
-                        Icons.AutoMirrored.Rounded.Send, 
+                        Icons.AutoMirrored.Rounded.Send,
                         contentDescription = "전송",
                         modifier = Modifier.size(20.dp)
                     )
@@ -864,7 +834,7 @@ private fun SpeechRecognitionLoadingPopup(
         composition = composition,
         iterations = LottieConstants.IterateForever
     )
-    
+
     Popup(
         onDismissRequest = {
             android.util.Log.d("STT_DEBUG", "🔄 Popup onDismissRequest 호출됨")
@@ -913,35 +883,35 @@ private fun SearchTopAppBar(
 ) {
     val context = LocalContext.current
     var lastShowToastTime by remember { mutableStateOf(0L) }
-    
+
     // 디바운싱을 위한 LaunchedEffect (검색 결과 변경 시 이전 작업 취소되도록 포함)
     LaunchedEffect(searchQuery, searchResults) {
         if (searchQuery.isNotBlank()) {
             // 입력 후 500ms 기다림 (디바운싱)
             kotlinx.coroutines.delay(500)
-            
+
             // 현재 시간
             val currentTime = System.currentTimeMillis()
-            
+
             // 검색 결과가 없고, 마지막 토스트 표시 후 2초 이상 지났으면 토스트 표시
             if (searchResults.isEmpty() && currentTime - lastShowToastTime > 2000) {
-            Toast.makeText(context, "검색 결과가 없습니다", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "검색 결과가 없습니다", Toast.LENGTH_SHORT).show()
                 lastShowToastTime = currentTime
             }
         }
     }
-    
+
     TopAppBar(
         modifier = Modifier.statusBarsPadding(),
         title = {
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = onSearchQueryChange,
-                placeholder = { 
+                placeholder = {
                     Text(
                         "번역 메시지 검색...",
                         style = MaterialTheme.typography.bodyMedium
-                    ) 
+                    )
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -979,7 +949,7 @@ private fun SearchTopAppBar(
             }
         }
     )
-} 
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1011,19 +981,19 @@ private fun ChatMenuDrawer(
                 modifier = Modifier.height(24.dp).width(95.dp),
                 tint = Color.Unspecified  // 원본 색상 유지
             )
-            
+
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (!isEditMode) {
                     TextButton(onClick = onCreateChatClick) {
                         Text(
-                            text = "+ 새 번역", 
+                            text = "+ 새 번역",
                             color = InputMessage,
                             fontWeight = FontWeight.SemiBold,
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
                 }
-                
+
                 TextButton(
                     onClick = { onEditModeToggle(!isEditMode) }
                 ) {
@@ -1036,16 +1006,16 @@ private fun ChatMenuDrawer(
                 }
             }
         }
-        
+
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         // 채팅 리스트
         LazyColumn(
             modifier = Modifier.weight(1f)
         ) {
             items(chats.size, key = { chats[it].id }) { index ->
                 val chat = chats[index]
-                
+
                 ChatItemInMenu(
                     chat = chat,
                     isCurrentChat = chat.id == currentChatId,
@@ -1053,7 +1023,7 @@ private fun ChatMenuDrawer(
                     onClick = { onChatClick(chat.id) },
                     onDelete = { onDeleteChat(chat.id) }
                 )
-                
+
                 // 마지막 아이템이 아니면 구분선 추가
                 if (index < chats.size - 1) {
                     HorizontalDivider(
@@ -1098,7 +1068,7 @@ private fun ChatItemInMenu(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(76.dp) 
+                .height(76.dp)
                 .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -1136,7 +1106,7 @@ private fun ChatItemInMenu(
                         style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp)
                     )
                 }
-                
+
                 // 타이틀 (아래쪽 배치)
                 Text(
                     text = chat.title,
@@ -1147,7 +1117,7 @@ private fun ChatItemInMenu(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            
+
             // 현재 채팅 표시 점 (휴지통과 같은 위치에 배치)
             if (isCurrentChat && !isEditMode) {
                 Box(
@@ -1165,7 +1135,7 @@ private fun ChatItemInMenu(
                     )
                 }
             }
-            
+
             if (isEditMode) {
                 IconButton(
                     onClick = onDelete,
@@ -1182,6 +1152,9 @@ private fun ChatItemInMenu(
         }
     }
 }
+
+
+
 
 
 
